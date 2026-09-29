@@ -1,5 +1,6 @@
-import type { ClientRegisterEventHandler } from '.'
 import type { StorageEventFromCore } from '@tg-search/core'
+
+import type { ClientRegisterEventHandler } from '.'
 
 import { useLogger } from '@guiiai/logg'
 import { CoreEventType } from '@tg-search/core'
