@@ -6,20 +6,20 @@ import { sql } from 'drizzle-orm'
 
 const CHAT_BATCH_SIZE = 50
 
-interface MessageSizeRow {
+interface MessageSizeRow extends Record<string, unknown> {
   id: string
   bytes: string
   media: CoreMessageMedia[]
 }
 
-interface PhotoSizeRow {
+interface PhotoSizeRow extends Record<string, unknown> {
   id: string
   bytes: string
   image_path: string
   image_thumbnail_path: string
 }
 
-interface StickerSizeRow {
+interface StickerSizeRow extends Record<string, unknown> {
   id: string
   bytes: string
   sticker_path: string
