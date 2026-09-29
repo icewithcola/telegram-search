@@ -6,6 +6,19 @@ import { defineInvokes } from '@moeru/eventa'
 import { createContext } from '@moeru/eventa/adapters/websocket/native'
 import { chatContracts, messageContracts, statsContracts } from '@tg-search/protocol'
 
+export function isEventaWebSocketFrame(data: unknown): boolean {
+  if (typeof data !== 'string')
+    return false
+
+  try {
+    const frame: unknown = JSON.parse(data)
+    return typeof frame === 'object' && frame !== null && 'id' in frame
+  }
+  catch {
+    return false
+  }
+}
+
 export function createWebSocketApplicationBridge(getSocket: () => WebSocket | undefined): ApplicationBridge {
   let binding: { socket: WebSocket, context: EventContext<any, any>, dispose: () => void } | undefined
 
@@ -23,10 +36,10 @@ export function createWebSocketApplicationBridge(getSocket: () => WebSocket | un
       onmessage: null,
       onopen: null,
     }
+    // The socket also carries legacy type/data notifications, which Eventa cannot decode.
     const forwardMessage = (event: MessageEvent) => {
-      if (event.data === '{"type":"server:pong"}')
-        return
-      facade.onmessage?.call(socket, event)
+      if (isEventaWebSocketFrame(event.data))
+        facade.onmessage?.call(socket, event)
     }
     const forwardClose = (event: CloseEvent) => facade.onclose?.call(socket, event)
     const forwardError = (event: Event) => facade.onerror?.call(socket, event)
