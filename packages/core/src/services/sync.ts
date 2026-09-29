@@ -12,6 +12,7 @@ import { accountModels } from '../models/accounts'
 import { chatMessageModels } from '../models/chat-message'
 import { chatModels } from '../models/chats'
 import { CoreEventType } from '../types/events'
+import { isChatWhitelisted } from '../utils/sync-whitelist'
 
 const MESSAGE_PROCESS_TIMEOUT_MS = 60_000
 const CHANNEL_DIFFERENCE_LIMIT = 100
@@ -226,8 +227,10 @@ export function createSyncService(ctx: CoreContext, logger: Logger) {
 
   async function catchUpChannels(accountId: string): Promise<void> {
     const client = ctx.getClient()
+    const whitelist = (await ctx.getAccountSettings()).syncWhitelist
     const channels = (await chatModels.fetchChatsByAccountId(ctx.getDB(), accountId))
       .expect('Failed to load channel checkpoints')
+      .filter(chat => isChatWhitelisted(whitelist, chat.chat_id, chat.chat_type))
       .filter(chat => (chat.chat_type === 'channel' || chat.chat_type === 'supergroup') && chat.access_hash && chat.pts > 0)
 
     for (const chat of channels) {

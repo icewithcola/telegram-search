@@ -27,3 +27,19 @@ Export reply snapshots may resolve outside the requested time range, while retai
 Local pagination cursors are non-negative safe integer offsets. Invalid or precision-losing cursors fail with `INVALID_ARGUMENT`; they never restart a read at offset zero. Telegram cursors remain positive message IDs and are validated for exact numeric conversion.
 
 Generated migration `0037_message-relationship-facts` adds nullable `chat_messages.telegram_metadata` to the existing message table. Existing rows remain unchanged until explicit synchronization provides native metadata.
+
+## Sync whitelist
+
+Account settings include `syncWhitelist` with `enabled`, `chatTypes`, `chatIds`, and
+`cleanExcluded`. It is disabled by default. When enabled, categories and explicit
+chat IDs are combined with OR; an empty selection accepts no messages. Filtering
+applies before message storage and media/embedding resolvers, including realtime,
+catch-up, and Takeout history. Unknown chat types require an explicit chat ID.
+
+Enable **Clean synced messages outside the whitelist** in Settings to hard-delete
+excluded local messages whenever settings are saved. This removes their embedded
+vectors and unreferenced database photo records in a transaction. Telegram data
+is unchanged. Shared chats accessible to other accounts and external media files
+are preserved. Deleted database space is reusable; database files need not shrink.
+Cleanup and message processing are ordered to prevent in-flight resolvers from
+restoring deleted messages. No schema migration is required.

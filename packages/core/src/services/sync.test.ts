@@ -73,6 +73,7 @@ function harness(invoke: (request: unknown) => Promise<unknown>, options: { wrap
     getClient: () => ({ invoke }),
     getCurrentAccountId: () => 'account-1',
     getDB: () => ({}),
+    getAccountSettings: async () => ({}),
     withError: vi.fn(error => error instanceof Error ? error : new Error(String(error))),
   }
   return { context, emitter, service: createSyncService(context as never, logger() as never) }

@@ -5,9 +5,11 @@ import type { AccountSettings } from '../types'
 
 import { safeParse } from 'valibot'
 
+import { chatMessageModels } from '../models/chat-message'
 import { accountSettingsSchema } from '../types'
 import { CoreEventType } from '../types/events'
 import { normalizeAccountSettings } from '../utils/account-settings'
+import { withSyncWhitelistLock } from '../utils/sync-whitelist'
 
 export type AccountSettingsService = ReturnType<typeof createAccountSettingsService>
 
@@ -31,7 +33,14 @@ export function createAccountSettingsService(ctx: CoreContext, logger: Logger) {
       throw new Error('Invalid config')
     }
 
-    await ctx.setAccountSettings(parsedAccountSettings.output)
+    await withSyncWhitelistLock(ctx, async () => {
+      await ctx.setAccountSettings(parsedAccountSettings.output)
+      const whitelist = parsedAccountSettings.output.syncWhitelist
+      if (whitelist.enabled && whitelist.cleanExcluded) {
+        await chatMessageModels.cleanOutsideWhitelist(ctx.getDB(), ctx.getCurrentAccountId(), whitelist)
+        ctx.emitter.emit(CoreEventType.StorageFetchDialogs, { accountId: ctx.getCurrentAccountId() })
+      }
+    })
 
     ctx.emitter.emit(CoreEventType.ConfigData, { accountSettings: parsedAccountSettings.output })
   }

@@ -8,6 +8,7 @@ import type { CoreDialog, DialogType } from '../types/dialog'
 import { convertToCoreRetrievalMessages } from '../models/utils/message'
 import { CoreEventType } from '../types/events'
 import { embedContents } from '../utils/embed'
+import { isChatWhitelisted, withSyncWhitelistLock } from '../utils/sync-whitelist'
 
 export function registerStorageEventHandlers(ctx: CoreContext, logger: Logger, dbModels: Models) {
   logger = logger.withContext('core:storage:event')
@@ -40,7 +41,15 @@ export function registerStorageEventHandlers(ctx: CoreContext, logger: Logger, d
   ctx.emitter.on(CoreEventType.StorageRecordMessages, async ({ messages }) => {
     const accountId = ctx.getCurrentAccountId()
 
-    await dbModels.chatMessageModels.recordMessages(ctx.getDB(), accountId, messages)
+    await withSyncWhitelistLock(ctx, async () => {
+      const { syncWhitelist } = await ctx.getAccountSettings()
+      if (syncWhitelist?.enabled) {
+        const chats = (await dbModels.chatModels.fetchChatsByAccountId(ctx.getDB(), accountId)).unwrap()
+        const types = new Map(chats.map(chat => [chat.chat_id, chat.chat_type]))
+        messages = messages.filter(message => isChatWhitelisted(syncWhitelist, message.chatId, types.get(message.chatId)))
+      }
+      await dbModels.chatMessageModels.recordMessages(ctx.getDB(), accountId, messages)
+    })
 
     logger.withFields({ count: messages.length }).verbose('Messages recorded')
   })
