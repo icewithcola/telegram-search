@@ -158,6 +158,10 @@ describe('storage/minio - initMinioMediaStorage', () => {
     const loaded = await provider!.load(location)
     expect(loaded).toBeInstanceOf(Uint8Array)
     expect(Array.from(loaded ?? [])).toEqual(Array.from(bytes))
+
+    statObject.mockResolvedValue({ size: bytes.length })
+    expect(await provider!.size(location)).toBe(bytes.length)
+    expect(statObject).toHaveBeenCalledWith('telegram-media-test', `photo/${uuid}`)
   })
 
   it('provider.load returns null and logs a warning when MinIO throws', async () => {

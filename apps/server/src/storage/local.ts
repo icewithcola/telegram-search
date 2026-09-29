@@ -109,6 +109,22 @@ export async function initLocalMediaStorage(logger: Logger, config?: MediaConfig
         return null
       }
     },
+
+    async size(location: MediaBinaryLocation): Promise<number | null> {
+      const resolvedPath = resolveLocationPath(baseDir, location.path)
+      if (!resolvedPath)
+        return null
+
+      try {
+        return (await stat(resolvedPath)).size
+      }
+      catch (error) {
+        if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT')
+          return null
+        logger.withError(error).warn('Failed to stat media in local storage')
+        return null
+      }
+    },
   }
 
   localMediaStorage = provider
