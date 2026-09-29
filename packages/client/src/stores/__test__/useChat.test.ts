@@ -100,4 +100,27 @@ describe('useChatStore', () => {
     expect(store.folders).toHaveLength(1)
     expect(store.folders[0].title).toBe('Folder 1')
   })
+
+  it('preserves folderIds from existing chats when merging Telegram-sourced dialogs', () => {
+    const store = useChatStore()
+
+    // Simulate DB-sourced dialogs (with folderIds)
+    store.mergeDialogs([
+      { id: 1, name: 'Chat 1', type: 'group', folderIds: [10, 20], includedChatIds: [], excludedChatIds: [] } as any,
+      { id: 2, name: 'Chat 2', type: 'channel', folderIds: [10], includedChatIds: [], excludedChatIds: [] } as any,
+    ])
+
+    // Simulate Telegram-sourced dialogs (without folderIds or with empty folderIds)
+    store.mergeDialogs([
+      { id: 1, name: 'Chat 1', type: 'group', folderIds: [] } as any,
+      { id: 2, name: 'Chat 2', type: 'channel' } as any,
+    ])
+
+    const chat1 = store.chats.find(c => c.id === 1)
+    const chat2 = store.chats.find(c => c.id === 2)
+
+    // folderIds should be preserved from the DB-sourced dialogs
+    expect(chat1?.folderIds).toEqual([10, 20])
+    expect(chat2?.folderIds).toEqual([10])
+  })
 })
