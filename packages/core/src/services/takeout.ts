@@ -18,6 +18,7 @@ import { MESSAGE_PROCESS_BATCH_SIZE, TELEGRAM_HISTORY_INTERVAL_MS } from '../con
 import { CoreEventType } from '../types/events'
 import { createMinIntervalWaiter } from '../utils/min-interval'
 import { waitForEvent } from '../utils/promise'
+import { isChatWhitelisted } from '../utils/sync-whitelist'
 import { createTask } from '../utils/task'
 
 export type TakeoutService = ReturnType<typeof createTakeoutService>
@@ -613,6 +614,13 @@ export function createTakeoutService(
 
     ctx.metrics?.takeoutRunTotal.inc()
     const runAbortController = new AbortController()
+
+    const whitelist = (await ctx.getAccountSettings()).syncWhitelist
+    if (whitelist?.enabled) {
+      const chats = (await chatModels.fetchChatsByAccountId(ctx.getDB(), ctx.getCurrentAccountId())).unwrap()
+      const types = new Map(chats.map(chat => [chat.chat_id, chat.chat_type]))
+      chatIds = chatIds.filter(id => isChatWhitelisted(whitelist, id, types.get(id)))
+    }
 
     for (const chatId of chatIds) {
       if (runAbortController.signal.aborted) {

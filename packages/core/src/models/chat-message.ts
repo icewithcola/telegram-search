@@ -5,7 +5,7 @@ import type { CorePagination } from '@tg-search/common'
 
 import type { CoreDB, CoreTransaction } from '../db'
 import type { JoinedChatType } from '../schemas/joined-chats'
-import type { EmbeddingDimension } from '../types/account-settings'
+import type { EmbeddingDimension, SyncWhitelist } from '../types/account-settings'
 import type { StorageMessageContextParams } from '../types/events'
 import type { CoreMessage } from '../types/message'
 import type { PromiseResult } from '../utils/result'
@@ -13,11 +13,12 @@ import type { PhotoModels } from './photos'
 import type { DBRetrievalMessages } from './utils/message'
 import type { DBInsertMessage, DBSelectMessage } from './utils/types'
 
-import { and, asc, desc, eq, gt, gte, inArray, lt, lte, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, gte, inArray, lt, lte, not, or, sql } from 'drizzle-orm'
 
 import { accountJoinedChatsTable } from '../schemas/account-joined-chats'
 import { chatMessagesTable } from '../schemas/chat-messages'
 import { joinedChatsTable } from '../schemas/joined-chats'
+import { photosTable } from '../schemas/photos'
 import { withResult } from '../utils/result'
 import { convertToCoreMessageFromDB, convertToDBInsertMessage } from './utils/message'
 import { convertDBPhotoToCoreMessageMedia } from './utils/photos'
@@ -562,7 +563,44 @@ async function retrieveMessages(
   })
 }
 
+/** Hard-delete only this account's data and shared chats unused by other accounts. */
+async function cleanOutsideWhitelist(db: CoreDB, accountId: string, whitelist: SyncWhitelist): Promise<void> {
+  if (!whitelist.enabled)
+    return
+
+  const allowed = or(
+    whitelist.chatIds.length ? inArray(chatMessagesTable.in_chat_id, whitelist.chatIds) : sql`false`,
+    whitelist.chatTypes.length ? inArray(chatMessagesTable.in_chat_type, whitelist.chatTypes) : sql`false`,
+  )!
+  await db.transaction(async (tx) => {
+    const deleted = await tx.delete(chatMessagesTable).where(and(
+      not(allowed),
+      or(
+        eq(chatMessagesTable.owner_account_id, accountId),
+        sql`(${chatMessagesTable.owner_account_id} IS NULL AND EXISTS (
+          SELECT 1 FROM ${joinedChatsTable} c
+          JOIN ${accountJoinedChatsTable} a ON a.joined_chat_id = c.id
+          WHERE c.chat_id = ${chatMessagesTable.in_chat_id} AND a.account_id = ${accountId}
+        ) AND NOT EXISTS (
+          SELECT 1 FROM ${joinedChatsTable} c
+          JOIN ${accountJoinedChatsTable} a ON a.joined_chat_id = c.id
+          WHERE c.chat_id = ${chatMessagesTable.in_chat_id} AND a.account_id <> ${accountId}
+        ))`,
+      ),
+    )).returning()
+    // Photos may be reused by multiple messages. Only remove orphaned message media.
+    for (let offset = 0; offset < deleted.length; offset += 1000) {
+      await tx.delete(photosTable).where(and(
+        inArray(photosTable.message_id, deleted.slice(offset, offset + 1000).map(row => row.id)),
+        sql`NOT EXISTS (SELECT 1 FROM ${chatMessagesTable} m,
+          jsonb_array_elements(m.media) media WHERE media->>'platformId' = ${photosTable.file_id})`,
+      ))
+    }
+  })
+}
+
 export const chatMessageModels = {
+  cleanOutsideWhitelist,
   recordMessages,
   softDeleteMessages,
   fetchMessages,

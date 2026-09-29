@@ -1,6 +1,6 @@
 import type { InferOutput } from 'valibot'
 
-import { array, boolean, enum as enumType, number, object, optional, string } from 'valibot'
+import { array, boolean, enum as enumType, number, object, optional, picklist, string } from 'valibot'
 
 export enum EmbeddingDimension {
   DIMENSION_1536 = 1536,
@@ -63,7 +63,17 @@ export const botConfigSchema = object({
   lastSearchChatId: optional(string()), // Remember last selected chat for search
 })
 
+export const syncWhitelistSchema = object({
+  enabled: optional(boolean(), false),
+  chatTypes: optional(array(picklist(['user', 'bot', 'group', 'supergroup', 'channel'])), []),
+  chatIds: optional(array(string()), []),
+  cleanExcluded: optional(boolean(), false),
+})
+
+export type SyncWhitelist = InferOutput<typeof syncWhitelistSchema>
+
 export const accountSettingsSchema = object({
+  syncWhitelist: optional(syncWhitelistSchema, {}),
   embedding: optional(embeddingConfigSchema, {}),
   llm: optional(llmConfigSchema, {}),
   visionLLM: optional(visionLLMConfigSchema, {}),

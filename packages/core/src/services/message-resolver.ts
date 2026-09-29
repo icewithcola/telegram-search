@@ -8,8 +8,10 @@ import type { SyncOptions } from '../types/events'
 import { withSpan } from '@tg-search/observability'
 
 import { chatMessageModels } from '../models/chat-message'
+import { chatModels } from '../models/chats'
 import { CoreEventType } from '../types/events'
 import { convertToCoreMessage } from '../utils/message'
+import { isChatWhitelisted, withSyncWhitelistLock } from '../utils/sync-whitelist'
 
 export type MessageResolverService = ReturnType<typeof createMessageResolverService>
 
@@ -30,7 +32,7 @@ export function createMessageResolverService(
       batchId?: string
     } = {},
   ) {
-    return withSpan('resolver:processMessages', () => processMessagesInner(messages, options), {
+    return withSpan('resolver:processMessages', () => withSyncWhitelistLock(ctx, () => processMessagesInner(messages, options)), {
       messageCount: messages.length,
       ...(options.takeout != null ? { takeout: options.takeout } : {}),
       ...(options.batchId != null ? { batchId: options.batchId } : {}),
@@ -54,6 +56,16 @@ export function createMessageResolverService(
       forceRefetch: options.forceRefetch,
     }).verbose('Process messages')
 
+    const settings = await ctx.getAccountSettings()
+    if (settings.syncWhitelist?.enabled) {
+      const chats = (await chatModels.fetchChatsByAccountId(ctx.getDB(), ctx.getCurrentAccountId())).unwrap()
+      const types = new Map(chats.map(chat => [chat.chat_id, chat.chat_type]))
+      messages = messages.filter((message) => {
+        const core = convertToCoreMessage(message).orUndefined()
+        return core != null && isChatWhitelisted(settings.syncWhitelist, core.chatId, types.get(core.chatId))
+      })
+    }
+
     // Sort by message ID in reverse order to process in reverse.
     messages = messages.sort((a, b) => Number(b.id) - Number(a.id))
 
@@ -62,6 +74,12 @@ export function createMessageResolverService(
       .filter(message => message != null)
 
     logger.withFields({ count: coreMessages.length }).debug('Converted messages')
+    if (coreMessages.length === 0) {
+      if (options.batchId) {
+        ctx.emitter.emit(CoreEventType.MessageProcessed, { batchId: options.batchId, count: 0, resolverSpans: [] })
+      }
+      return
+    }
 
     // Avatar resolver is disabled by default (configured in generateDefaultConfig).
     // Current strategy: client-driven, on-demand avatar loading via entity:avatar:fetch.
@@ -101,7 +119,7 @@ export function createMessageResolverService(
           const result = (await userResolver[1].run!(baseResolverOpts)).unwrap()
 
           if (result.length > 0) {
-            ctx.emitter.emit(CoreEventType.StorageRecordMessages, { messages: result })
+            await chatMessageModels.recordMessages(ctx.getDB(), ctx.getCurrentAccountId(), result)
           }
         }, { resolver: 'user', messageCount: coreMessages.length })
       }
@@ -150,7 +168,7 @@ export function createMessageResolverService(
             const result = (await resolver.run(baseResolverOpts)).unwrap()
 
             if (result.length > 0) {
-              ctx.emitter.emit(CoreEventType.StorageRecordMessages, { messages: result })
+              await chatMessageModels.recordMessages(ctx.getDB(), ctx.getCurrentAccountId(), result)
             }
           }
           else if (resolver.stream) {
@@ -159,7 +177,7 @@ export function createMessageResolverService(
                 ctx.emitter.emit(CoreEventType.MessageData, { messages: [message] })
               }
 
-              ctx.emitter.emit(CoreEventType.StorageRecordMessages, { messages: [message] })
+              await chatMessageModels.recordMessages(ctx.getDB(), ctx.getCurrentAccountId(), [message])
             }
           }
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useAccountStore, useBridge } from '@tg-search/client'
+import { useAccountStore, useBridge, useChatStore } from '@tg-search/client'
 import { CoreEventType } from '@tg-search/core'
 import { storeToRefs } from 'pinia'
 import { computed, ref, watch } from 'vue'
@@ -19,6 +19,18 @@ const { t } = useI18n()
 
 const bridge = useBridge()
 const accountStore = useAccountStore()
+const chatStore = useChatStore()
+const whitelistSearch = ref('')
+const whitelistChatTypes = [
+  { value: 'user', label: 'Personal chats' },
+  { value: 'bot', label: 'Bots' },
+  { value: 'group', label: 'Groups' },
+  { value: 'supergroup', label: 'Supergroups' },
+  { value: 'channel', label: 'Channels' },
+]
+const whitelistChats = computed(() => chatStore.chats.filter(chat =>
+  `${chat.name} ${chat.id}`.toLowerCase().includes(whitelistSearch.value.toLowerCase()),
+))
 const { accountSettings, hasFetchedSettings, isReady } = storeToRefs(accountStore)
 const isConfigLoaded = ref(false)
 const isConfigLoading = ref(false)
@@ -219,7 +231,7 @@ async function updateConfig() {
   const payload = createAccountSettingsSavePayload(accountSettings.value)
 
   try {
-    const pendingSave = waitForMatchingSavedSettings(5000, payload)
+    const pendingSave = waitForMatchingSavedSettings(120_000, payload)
     bridge.sendEvent(CoreEventType.ConfigUpdate, { accountSettings: payload })
     await pendingSave
     toast.success(t('settings.settingsSavedSuccessfully'), { id: toastId })
@@ -279,6 +291,49 @@ async function updateConfig() {
       </div>
 
       <div v-else class="mx-auto max-w-4xl p-4 space-y-8 md:p-6">
+        <section v-if="accountSettings?.syncWhitelist" class="border rounded-xl bg-card p-6 space-y-4">
+          <div class="flex items-center justify-between gap-4">
+            <div>
+              <h2 class="text-xl font-semibold">
+                Sync whitelist
+              </h2>
+              <p class="text-sm text-muted-foreground">
+                Only sync messages from selected categories or individual chats. Save to apply.
+              </p>
+            </div>
+            <Switch v-model:checked="accountSettings.syncWhitelist.enabled" />
+          </div>
+          <template v-if="accountSettings.syncWhitelist.enabled">
+            <div class="flex flex-wrap gap-4">
+              <label v-for="category in whitelistChatTypes" :key="category.value" class="flex items-center gap-2 text-sm">
+                <input v-model="accountSettings.syncWhitelist.chatTypes" type="checkbox" :value="category.value">
+                {{ category.label }}
+              </label>
+            </div>
+            <label class="block text-sm font-medium" for="whitelist-search">Individual chats</label>
+            <input id="whitelist-search" v-model="whitelistSearch" placeholder="Search chats by name or ID" class="w-full border rounded-md bg-background px-3 py-2 text-sm">
+            <div class="max-h-64 overflow-y-auto space-y-2">
+              <label v-for="chat in whitelistChats" :key="chat.id" class="flex items-center gap-2 text-sm">
+                <input v-model="accountSettings.syncWhitelist.chatIds" type="checkbox" :value="String(chat.id)">
+                {{ chat.name }} <span class="text-muted-foreground">({{ chat.type }} · {{ chat.id }})</span>
+              </label>
+              <p v-if="!whitelistChats.length" class="text-sm text-muted-foreground">
+                No matching chats. Load your chats from the Chats page if needed.
+              </p>
+            </div>
+            <p class="text-sm text-muted-foreground">
+              Selecting nothing stops all message syncing. Categories also include future chats of that type.
+            </p>
+            <label class="flex items-center gap-2 text-sm font-medium">
+              <input v-model="accountSettings.syncWhitelist.cleanExcluded" type="checkbox">
+              Clean synced messages outside the whitelist when saving settings
+            </label>
+            <p class="text-sm text-muted-foreground">
+              Permanently removes local messages, embeddings, and unreferenced stored photos. Telegram messages are unchanged. Shared messages used by other accounts are kept. Database space becomes reusable; external media files are retained.
+            </p>
+          </template>
+        </section>
+
         <!-- API settings -->
         <section class="space-y-6">
           <div class="px-2 md:px-0">

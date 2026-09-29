@@ -50,6 +50,41 @@ function buildCoreMessage(overrides: Partial<CoreMessage> = {}): CoreMessage {
 }
 
 describe('models/chat-message', () => {
+  it('cleans excluded messages and photos while preserving allowed and other-account data', async () => {
+    const db = await setupDb()
+    const [owner, other] = await db.insert(accountsTable).values([
+      { platform: 'telegram', platform_user_id: 'cleanup-owner' },
+      { platform: 'telegram', platform_user_id: 'cleanup-other' },
+    ]).returning()
+    const chats = await db.insert(joinedChatsTable).values([
+      { chat_id: 'personal', chat_type: 'user' },
+      { chat_id: 'excluded', chat_type: 'group' },
+      { chat_id: 'explicit', chat_type: 'group' },
+      { chat_id: 'shared', chat_type: 'group' },
+    ]).returning()
+    await db.insert(accountJoinedChatsTable).values([
+      ...chats.map(chat => ({ account_id: owner.id, joined_chat_id: chat.id })),
+      { account_id: other.id, joined_chat_id: chats[3].id },
+    ])
+    for (const chat of chats)
+      await chatMessageModels.recordMessages(db, owner.id, [buildCoreMessage({ chatId: chat.chat_id })])
+    await chatMessageModels.recordMessages(db, other.id, [buildCoreMessage({ chatId: 'personal' })])
+    const before = await db.select().from(chatMessagesTable)
+    const excluded = before.find(row => row.in_chat_id === 'excluded')!
+    await db.insert(photosTable).values({ file_id: 'excluded-photo', message_id: excluded.id })
+    const whitelist = { enabled: true, cleanExcluded: true, chatIds: ['explicit'], chatTypes: ['user'] as const }
+    await chatMessageModels.cleanOutsideWhitelist(db, owner.id, { ...whitelist, chatTypes: [...whitelist.chatTypes] })
+    const after = await db.select().from(chatMessagesTable)
+    expect(after.map(row => row.in_chat_id).sort()).toEqual(['explicit', 'personal', 'personal', 'shared'])
+    expect(await db.select().from(photosTable)).toHaveLength(0)
+    // An empty whitelist deletes the owner's private data, never another owner's copy.
+    await chatMessageModels.cleanOutsideWhitelist(db, owner.id, { enabled: true, cleanExcluded: true, chatIds: [], chatTypes: [] })
+    const remaining = await db.select().from(chatMessagesTable)
+    expect(remaining).toHaveLength(2)
+    expect(remaining.find(row => row.in_chat_id === 'personal')?.owner_account_id).toBe(other.id)
+    expect(remaining.some(row => row.in_chat_id === 'shared')).toBe(true)
+  })
+
   async function accountIsolationFixture() {
     const db = await setupDb()
     const [owner, other] = await db.insert(accountsTable).values([
