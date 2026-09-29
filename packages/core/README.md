@@ -25,9 +25,12 @@ restoring deleted messages. No schema migration is required.
 ## Storage usage
 
 Settings shows the combined physical size of public application tables and their
-indexes across all accounts. The Sync page shows estimated message and photo row
-sizes for the focused chat, scoped to the current account's accessible messages.
-Message rows include embeddings. Photo rows include inline binary data stored in
-the database. Chat estimates exclude shared indexes and free space, so they do not
-add up to the overall database size. Refresh either view to update its snapshot.
-Inspection is read-only and requires no schema migration.
+indexes across all accounts. On the Sync page, click Calculate for the focused
+chat to scan accessible messages in bounded batches. Progress is streamed over
+the existing event bridge, and leaving the page cancels the scan. Chat estimates
+include message embeddings, photo and sticker records, inline bytes, and the
+sizes of externally stored media files. File sizes are read from metadata without
+loading the files. Completed chat results are cached per browser session and chat;
+Refresh recalculates them. Missing media is reported. Chat estimates exclude
+shared indexes and free space and need not add up to the database total. This
+read-only inspection requires no schema migration.

@@ -44,6 +44,7 @@ describe('adapters/core-media - hydrateMediaBlobWithCore', () => {
   it('hydrates photo blob via MediaBinaryProvider when image_path is present', async () => {
     const bytes = new Uint8Array([1, 2, 3])
     const provider: MediaBinaryProvider = {
+      async size() { return null },
       async save() {
         throw new Error('not used in this test')
       },
@@ -113,6 +114,7 @@ describe('adapters/core-media - hydrateMediaBlobWithCore', () => {
     const bytes = new Uint8Array([7, 8, 9])
 
     const provider: MediaBinaryProvider = {
+      async size() { return null },
       async save() {
         throw new Error('not used in this test')
       },

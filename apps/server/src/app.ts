@@ -47,6 +47,7 @@ export function isEventaFrame(message: unknown): message is { id: unknown } {
 }
 
 const peerRpcStates = new Map<string, PeerRpcState>()
+const peerUsageRequests = new Map<string, Set<string>>()
 type EventaPeer = Parameters<typeof createPeerContext>[0]
 
 // NOTICE: H3 and Eventa resolve nominally distinct crossws Peer declarations
@@ -191,6 +192,17 @@ export function setupWsRoutes(app: H3, config: Config) {
           return
         }
 
+        if (event.type === CoreEventType.StorageFetchUsage && event.data.chatId !== undefined) {
+          const requests = peerUsageRequests.get(peer.id) ?? new Set<string>()
+          requests.add(event.data.requestId)
+          peerUsageRequests.set(peer.id, requests)
+        }
+        else if (event.type === CoreEventType.StorageCancelUsage) {
+          if (!peerUsageRequests.get(peer.id)?.has(event.data.requestId))
+            return
+          peerUsageRequests.get(peer.id)?.delete(event.data.requestId)
+        }
+
         const tracingId = event.meta?.tracingId || uuidv4()
 
         logger.withFields({ type: event.type, accountId, tracingId }).verbose('Message received')
@@ -213,6 +225,8 @@ export function setupWsRoutes(app: H3, config: Config) {
       logger.withFields({ peerId: peer.id }).log('WebSocket connection closed')
       wsConnectionsActive.add(-1, { mode: WS_MODE_LABEL })
 
+      const pendingUsageRequests = peerUsageRequests.get(peer.id)
+      peerUsageRequests.delete(peer.id)
       const accountId = peerToAccountId.get(peer.id)
       if (!accountId) {
         return
@@ -222,6 +236,9 @@ export function setupWsRoutes(app: H3, config: Config) {
       if (!account) {
         return
       }
+
+      for (const requestId of pendingUsageRequests ?? [])
+        account.ctx.emitter.emit(CoreEventType.StorageCancelUsage, { requestId })
 
       // Remove this peer from the account (cleanup transient state)
       account.activePeers.delete(peer.id)

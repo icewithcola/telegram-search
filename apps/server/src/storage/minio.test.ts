@@ -13,6 +13,7 @@ const bucketExists = vi.fn()
 const makeBucket = vi.fn()
 const putObject = vi.fn()
 const getObject = vi.fn()
+const statObject = vi.fn()
 
 vi.mock('minio', () => {
   class MockMinioClient {
@@ -20,6 +21,7 @@ vi.mock('minio', () => {
     makeBucket = makeBucket
     putObject = putObject
     getObject = getObject
+    statObject = statObject
 
     constructor(public readonly options: any) {}
   }
@@ -106,6 +108,10 @@ describe('storage/minio - initMinioMediaStorage', () => {
     const loaded = await provider!.load(location)
     expect(loaded).toBeInstanceOf(Uint8Array)
     expect(Array.from(loaded ?? [])).toEqual(Array.from(bytes))
+
+    statObject.mockResolvedValue({ size: bytes.length })
+    expect(await provider!.size(location)).toBe(bytes.length)
+    expect(statObject).toHaveBeenCalledWith('telegram-media-test', `photo/${uuid}`)
   })
 
   it('provider.load returns null and logs a warning when MinIO throws', async () => {

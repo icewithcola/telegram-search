@@ -59,6 +59,7 @@ export enum CoreEventType {
   EntityAvatarData = 'entity:avatar:data',
 
   StorageFetchUsage = 'storage:fetch:usage',
+  StorageCancelUsage = 'storage:cancel:usage',
   StorageUsage = 'storage:usage',
   StorageRecordMessages = 'storage:record:messages',
   StorageFetchDialogs = 'storage:fetch:dialogs',
@@ -303,6 +304,7 @@ export interface StorageEventToCore {
   [CoreEventType.StorageRecordMessages]: (data: { messages: CoreMessage[] }) => void
 
   [CoreEventType.StorageFetchUsage]: (data: { requestId: string, chatId?: string }) => void
+  [CoreEventType.StorageCancelUsage]: (data: { requestId: string }) => void
   [CoreEventType.StorageFetchDialogs]: (data: { accountId: string }) => void
   [CoreEventType.StorageRecordDialogs]: (data: { dialogs: CoreDialog[], accountId: string }) => void
   [CoreEventType.StorageRecordChatFolders]: (data: { folders: CoreChatFolder[], accountId: string }) => void
@@ -318,7 +320,7 @@ export interface StorageEventToCore {
 export interface StorageEventFromCore {
   [CoreEventType.StorageDialogs]: (data: { dialogs: CoreDialog[] }) => void
 
-  [CoreEventType.StorageUsage]: (data: { requestId: string } & ({ usage: StorageUsage, error?: never } | { usage?: never, error: string })) => void
+  [CoreEventType.StorageUsage]: (data: { requestId: string } & ({ usage: StorageUsage, done: boolean, error?: never } | { usage?: never, done?: never, error: string })) => void
   [CoreEventType.StorageSearchMessagesData]: (data: { messages: CoreRetrievalMessages[], hasMore: boolean, requestId?: string }) => void
   [CoreEventType.StorageSearchPhotosData]: (data: { photos: CoreRetrievalPhoto[], hasMore: boolean, requestId?: string }) => void
 

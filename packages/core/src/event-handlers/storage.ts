@@ -4,26 +4,101 @@ import type { CoreContext } from '../context'
 import type { Models } from '../models'
 import type { DBRetrievalMessages } from '../models/utils/message'
 import type { CoreDialog, DialogType } from '../types/dialog'
+import type { MediaBinaryLocation, MediaBinaryProvider, StorageUsage } from '../types/storage'
 
-import { fetchChatStorageUsage, fetchStorageUsage } from '../models/storage'
+import { fetchChatStorageBatch, fetchStorageUsage } from '../models/storage'
 import { convertToCoreRetrievalMessages } from '../models/utils/message'
 import { CoreEventType } from '../types/events'
 import { embedContents } from '../utils/embed'
 import { isChatWhitelisted, withSyncWhitelistLock } from '../utils/sync-whitelist'
 
-export function registerStorageEventHandlers(ctx: CoreContext, logger: Logger, dbModels: Models) {
+export function registerStorageEventHandlers(ctx: CoreContext, logger: Logger, dbModels: Models, mediaBinaryProvider: MediaBinaryProvider | undefined) {
   logger = logger.withContext('core:storage:event')
+  const usageRequests = new Map<string, AbortController>()
+
+  ctx.emitter.on(CoreEventType.StorageCancelUsage, ({ requestId }) => {
+    usageRequests.get(requestId)?.abort()
+  })
 
   ctx.emitter.on(CoreEventType.StorageFetchUsage, async ({ requestId, chatId }) => {
+    const controller = new AbortController()
+    usageRequests.get(requestId)?.abort()
+    usageRequests.set(requestId, controller)
     try {
-      const usage = chatId !== undefined
-        ? await fetchChatStorageUsage(ctx.getDB(), ctx.getCurrentAccountId(), chatId)
-        : await fetchStorageUsage(ctx.getDB())
-      ctx.emitter.emit(CoreEventType.StorageUsage, { requestId, usage })
+      if (chatId === undefined) {
+        const usage = await fetchStorageUsage(ctx.getDB())
+        if (!controller.signal.aborted)
+          ctx.emitter.emit(CoreEventType.StorageUsage, { requestId, usage, done: true })
+        return
+      }
+
+      const accountId = ctx.getCurrentAccountId()
+      const usage = { totalBytes: 0, messageBytes: 0, photoBytes: 0, stickerBytes: 0, mediaBytes: 0, missingMedia: 0, scannedMessages: 0 } satisfies StorageUsage
+      const seenPhotos = new Set<string>()
+      const seenStickers = new Set<string>()
+      const seenMediaPaths = new Set<string>()
+      let cursor: string | undefined
+
+      // Bounded database pages and metadata-only reads keep large chats from loading media into memory.
+      while (!controller.signal.aborted) {
+        const batch = await fetchChatStorageBatch(ctx.getDB(), accountId, chatId, cursor)
+        if (controller.signal.aborted)
+          break
+        usage.messageBytes += batch.messageBytes
+        usage.scannedMessages += batch.messageCount
+
+        const locations: MediaBinaryLocation[] = []
+        for (const photo of batch.photos) {
+          if (seenPhotos.has(photo.id))
+            continue
+          seenPhotos.add(photo.id)
+          usage.photoBytes += Number(photo.bytes)
+          if (photo.image_path)
+            locations.push({ kind: 'photo', path: photo.image_path })
+          if (photo.image_thumbnail_path)
+            locations.push({ kind: 'photo', path: photo.image_thumbnail_path })
+        }
+        for (const sticker of batch.stickers) {
+          if (seenStickers.has(sticker.id))
+            continue
+          seenStickers.add(sticker.id)
+          usage.stickerBytes += Number(sticker.bytes)
+          if (sticker.sticker_path)
+            locations.push({ kind: 'sticker', path: sticker.sticker_path })
+        }
+
+        for (const location of locations) {
+          if (controller.signal.aborted)
+            break
+          const key = `${location.kind}:${location.path}`
+          if (seenMediaPaths.has(key))
+            continue
+          seenMediaPaths.add(key)
+          const bytes = mediaBinaryProvider ? await mediaBinaryProvider.size(location) : null
+          if (bytes === null)
+            usage.missingMedia += 1
+          else
+            usage.mediaBytes += bytes
+        }
+        if (controller.signal.aborted)
+          break
+
+        usage.totalBytes = usage.messageBytes + usage.photoBytes + usage.stickerBytes + usage.mediaBytes
+        ctx.emitter.emit(CoreEventType.StorageUsage, { requestId, usage: { ...usage }, done: !batch.hasMore })
+        if (!batch.hasMore)
+          break
+        cursor = batch.cursor
+        await new Promise(resolve => setTimeout(resolve, 0))
+      }
     }
     catch (error) {
       logger.withError(error).warn('Failed to inspect storage usage')
-      ctx.emitter.emit(CoreEventType.StorageUsage, { requestId, error: 'Failed to inspect storage usage' })
+      if (!controller.signal.aborted)
+        ctx.emitter.emit(CoreEventType.StorageUsage, { requestId, error: 'Failed to inspect storage usage' })
+    }
+    finally {
+      if (usageRequests.get(requestId) === controller)
+        usageRequests.delete(requestId)
     }
   })
 

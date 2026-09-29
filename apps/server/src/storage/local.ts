@@ -2,7 +2,7 @@ import type { Logger } from '@guiiai/logg'
 import type { MediaConfig } from '@tg-search/common'
 import type { MediaBinaryDescriptor, MediaBinaryLocation, MediaBinaryProvider } from '@tg-search/core'
 
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, stat, writeFile } from 'node:fs/promises'
 
 import { useDataPath } from '@tg-search/common/node'
 import { dirname, join, posix, resolve, sep } from 'pathe'
@@ -68,6 +68,22 @@ export async function initLocalMediaStorage(logger: Logger, config?: MediaConfig
         }
 
         logger.withError(error).warn('Failed to load media from local storage; returning null')
+        return null
+      }
+    },
+
+    async size(location: MediaBinaryLocation): Promise<number | null> {
+      const resolvedPath = resolveLocationPath(baseDir, location.path)
+      if (!resolvedPath)
+        return null
+
+      try {
+        return (await stat(resolvedPath)).size
+      }
+      catch (error) {
+        if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT')
+          return null
+        logger.withError(error).warn('Failed to stat media in local storage')
         return null
       }
     },

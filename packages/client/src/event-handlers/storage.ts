@@ -1,10 +1,19 @@
 import type { ClientRegisterEventHandler } from '.'
+import type { StorageEventFromCore } from '@tg-search/core'
 
 import { useLogger } from '@guiiai/logg'
 import { CoreEventType } from '@tg-search/core'
 
 import { useChatStore } from '../stores/useChat'
 import { prefillChatAvatarIntoStore } from '../utils/avatar-cache'
+
+type UsageEvent = Parameters<StorageEventFromCore[CoreEventType.StorageUsage]>[0]
+const usageListeners = new Map<string, (data: UsageEvent) => void>()
+
+export function subscribeStorageUsage(requestId: string, listener: (data: UsageEvent) => void): () => void {
+  usageListeners.set(requestId, listener)
+  return () => usageListeners.delete(requestId)
+}
 
 /**
  * Register storage-related client event handlers.
@@ -28,7 +37,9 @@ export function registerStorageEventHandlers(
     })
   })
 
-  registerEventHandler(CoreEventType.StorageUsage, (_) => {})
+  registerEventHandler(CoreEventType.StorageUsage, (data) => {
+    usageListeners.get(data.requestId)?.(data)
+  })
 
   // Wait for result event
   registerEventHandler(CoreEventType.StorageSearchMessagesData, (_) => {})

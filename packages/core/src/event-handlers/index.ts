@@ -70,7 +70,7 @@ export function basicEventHandler(ctx: CoreContext, config: Config, mediaBinaryP
   registry.register('embedding', createEmbeddingResolver(ctx, logger))
   registry.register('jieba', createJiebaResolver(logger))
 
-  registerStorageEventHandlers(ctx, logger, models)
+  registerStorageEventHandlers(ctx, logger, models, mediaBinaryProvider)
   registerAccountSettingsEventHandlers(ctx, logger)(configService)
   registerMessageResolverEventHandlers(ctx, logger)(messageResolverService)
 
