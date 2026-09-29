@@ -14,7 +14,6 @@ import App from './App.vue'
 
 import { LOG_LEVEL } from './constants'
 import { i18n } from './modules/i18n'
-import { initPosthog } from './modules/posthog'
 import { createPGliteDevtoolsPlugin } from './plugins/pglite-devtools'
 
 import '@unocss/reset/tailwind.css'
@@ -24,7 +23,6 @@ import 'markstream-vue/index.css'
 import 'vue-sonner/style.css'
 import './styles/main.css'
 
-initPosthog()
 initLogger(LOG_LEVEL, LoggerFormat.Pretty)
 
 const app = createApp(App)
