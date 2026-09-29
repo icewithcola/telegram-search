@@ -137,6 +137,10 @@ export const useChatStore = defineStore('chat', () => {
         ...(options.preserveUnreadCount && existingChat.unreadCount != null
           ? { unreadCount: existingChat.unreadCount }
           : {}),
+        // Telegram-sourced dialog lists carry no folderIds; keep the DB-derived ones
+        ...(!incomingChat.folderIds?.length && existingChat.folderIds?.length
+          ? { folderIds: existingChat.folderIds }
+          : {}),
       }
     })
   }
