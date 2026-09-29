@@ -5,6 +5,8 @@ import { VList } from 'virtua/vue'
 import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 
+import { matchesFolder } from '../utils/chat-list'
+
 import EntityAvatar from './avatar/EntityAvatar.vue'
 
 import { Input } from './ui/Input'
@@ -65,7 +67,7 @@ const filteredChats = computed(() => {
       const folderId = Number(selectedFilter.value.split(':')[1])
       const folder = props.folders?.find(f => f.id === folderId)
       if (folder) {
-        filtered = filtered.filter(chat => chat.folderIds?.includes(folderId))
+        filtered = filtered.filter(chat => matchesFolder(chat, folder))
       }
     }
   }
