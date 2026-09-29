@@ -28,6 +28,8 @@ export function registerStorageEventHandlers(
     })
   })
 
+  registerEventHandler(CoreEventType.StorageUsage, (_) => {})
+
   // Wait for result event
   registerEventHandler(CoreEventType.StorageSearchMessagesData, (_) => {})
   registerEventHandler(CoreEventType.StorageMessageEditMarks, (_) => {})

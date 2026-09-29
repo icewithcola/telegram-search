@@ -5,6 +5,7 @@ import type { Api } from 'telegram'
 import type { AccountSettings } from './account-settings'
 import type { CoreChatFolder, CoreDialog, DialogType } from './dialog'
 import type { CoreMessage } from './message'
+import type { StorageUsage } from './storage'
 import type { CoreTask, CoreTaskData } from './task'
 
 export enum CoreEventType {
@@ -57,6 +58,8 @@ export enum CoreEventType {
   EntityMeData = 'entity:me:data',
   EntityAvatarData = 'entity:avatar:data',
 
+  StorageFetchUsage = 'storage:fetch:usage',
+  StorageUsage = 'storage:usage',
   StorageRecordMessages = 'storage:record:messages',
   StorageFetchDialogs = 'storage:fetch:dialogs',
   StorageRecordDialogs = 'storage:record:dialogs',
@@ -299,6 +302,7 @@ export type CoreEntity = CoreUserEntity | CoreChatEntity | CoreChannelEntity
 export interface StorageEventToCore {
   [CoreEventType.StorageRecordMessages]: (data: { messages: CoreMessage[] }) => void
 
+  [CoreEventType.StorageFetchUsage]: (data: { requestId: string, chatId?: string }) => void
   [CoreEventType.StorageFetchDialogs]: (data: { accountId: string }) => void
   [CoreEventType.StorageRecordDialogs]: (data: { dialogs: CoreDialog[], accountId: string }) => void
   [CoreEventType.StorageRecordChatFolders]: (data: { folders: CoreChatFolder[], accountId: string }) => void
@@ -314,6 +318,7 @@ export interface StorageEventToCore {
 export interface StorageEventFromCore {
   [CoreEventType.StorageDialogs]: (data: { dialogs: CoreDialog[] }) => void
 
+  [CoreEventType.StorageUsage]: (data: { requestId: string } & ({ usage: StorageUsage, error?: never } | { usage?: never, error: string })) => void
   [CoreEventType.StorageSearchMessagesData]: (data: { messages: CoreRetrievalMessages[], hasMore: boolean, requestId?: string }) => void
   [CoreEventType.StorageSearchPhotosData]: (data: { photos: CoreRetrievalPhoto[], hasMore: boolean, requestId?: string }) => void
 

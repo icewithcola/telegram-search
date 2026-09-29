@@ -29,6 +29,7 @@ import { toast } from 'vue-sonner'
 
 import ChatSelector from '../components/ChatSelector.vue'
 import MobileSyncStatsDrawer from '../components/MobileSyncStatsDrawer.vue'
+import StorageUsage from '../components/StorageUsage.vue'
 import SyncSelectedSummaryPanel from '../components/SyncSelectedSummaryPanel.vue'
 import SyncVisualization from '../components/SyncVisualization.vue'
 
@@ -726,6 +727,14 @@ function startSync() {
             </template>
           </ChatSelector>
         </div>
+
+        <StorageUsage
+          v-if="visualizationChat"
+          :key="String(visualizationChat.id)"
+          :chat-id="String(visualizationChat.id)"
+          :chat-name="visualizationChat.name"
+          class="mx-3 mb-3 shrink-0 md:mx-4"
+        />
 
         <div v-if="!isBottomPanelOpen" class="justify-end px-3 pb-3 hidden md:flex md:px-4">
           <Button

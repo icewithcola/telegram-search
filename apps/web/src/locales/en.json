@@ -367,5 +367,17 @@
   },
   "virtualMessageList": {
     "scrolling": "Loading..."
+  },
+  "storage": {
+    "title": "Database storage",
+    "chatTitle": "Storage · {name}",
+    "description": "Application tables and indexes across all accounts. Excludes separately stored media files and browser caches.",
+    "chatDescription": "Estimated message rows (including embeddings) and photo rows for this chat. Excludes shared indexes, free space and separately stored media. Shared chats count toward each account; estimates do not add up to the database total.",
+    "total": "Total",
+    "messages": "Messages and embeddings",
+    "photos": "Photo records",
+    "refresh": "Refresh",
+    "loading": "Loading…",
+    "failed": "Could not load storage usage. Try refreshing."
   }
 }

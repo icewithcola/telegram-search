@@ -21,3 +21,13 @@ is unchanged. Shared chats accessible to other accounts and external media files
 are preserved. Deleted database space is reusable; database files need not shrink.
 Cleanup and message processing are ordered to prevent in-flight resolvers from
 restoring deleted messages. No schema migration is required.
+
+## Storage usage
+
+Settings shows the combined physical size of public application tables and their
+indexes across all accounts. The Sync page shows estimated message and photo row
+sizes for the focused chat, scoped to the current account's accessible messages.
+Message rows include embeddings. Chat estimates exclude shared indexes and free
+space, so they do not add up to the overall database size. Separately stored media
+files and browser caches are excluded from both views. Refresh either view to
+update its snapshot. Inspection is read-only and requires no schema migration.
