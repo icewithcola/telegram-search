@@ -756,7 +756,7 @@ function startSync() {
           isBottomPanelOpen ? 'max-h-[58vh] opacity-100 md:max-h-[24rem]' : 'max-h-0 opacity-0',
         ]"
       >
-        <div class="max-h-[58vh] overflow-y-auto px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2 md:max-h-none md:overflow-visible md:pb-3">
+        <div class="max-h-[58vh] overflow-y-auto px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2 md:max-h-[24rem] md:overflow-y-auto md:pb-3">
           <div>
             <div
               class="grid min-h-0 gap-0"
