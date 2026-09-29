@@ -3,9 +3,16 @@ import type { TelegramApplicationRuntime } from '@tg-search/core'
 import { describe, expect, it, vi } from 'vitest'
 
 import { createLocalApplicationBridge } from './eventa-local'
-import { createWebSocketApplicationBridge } from './eventa-websocket'
+import { createWebSocketApplicationBridge, isEventaWebSocketFrame } from './eventa-websocket'
 
 describe('eventa application adapters', () => {
+  it('routes Eventa frames while excluding legacy notifications from its decoder', () => {
+    // Legacy type/data notifications previously reached Eventa and logged Invalid EventaInner.
+    expect(isEventaWebSocketFrame(JSON.stringify({ type: 'storage:usage', data: { requestId: 'usage' } }))).toBe(false)
+    expect(isEventaWebSocketFrame(JSON.stringify({ id: 'delivery', deliveryId: 'delivery', hopsRemaining: 32, eventa: { id: 'tg.v1.chats.list' } }))).toBe(true)
+    expect(isEventaWebSocketFrame('invalid JSON')).toBe(false)
+  })
+
   it('exposes the same application invoke surface in local and WebSocket modes', () => {
     const local = createLocalApplicationBridge(() => {
       throw new Error('not invoked')
@@ -39,6 +46,10 @@ describe('eventa application adapters', () => {
 
     expect(socket.onmessage).toBe(originalOnMessage)
     expect(socket.send).toHaveBeenCalledOnce()
+    const logError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    socket.dispatchEvent(new MessageEvent('message', { data: JSON.stringify({ type: 'storage:usage', data: { requestId: 'usage' } }) }))
+    expect(logError).not.toHaveBeenCalled()
+    logError.mockRestore()
     await bridge.dispose?.()
     await expect(pending).rejects.toThrow()
   })
