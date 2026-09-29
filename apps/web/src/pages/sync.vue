@@ -728,14 +728,6 @@ function startSync() {
           </ChatSelector>
         </div>
 
-        <StorageUsage
-          v-if="visualizationChat"
-          :key="String(visualizationChat.id)"
-          :chat-id="String(visualizationChat.id)"
-          :chat-name="visualizationChat.name"
-          class="mx-3 mb-3 shrink-0 md:mx-4"
-        />
-
         <div v-if="!isBottomPanelOpen" class="justify-end px-3 pb-3 hidden md:flex md:px-4">
           <Button
             variant="ghost"
@@ -753,10 +745,10 @@ function startSync() {
       <div
         class="shrink-0 overflow-hidden border-t bg-background/95 backdrop-blur-sm transition-all duration-300 ease-in-out hidden md:block"
         :class="[
-          isBottomPanelOpen ? 'max-h-[58vh] opacity-100 md:max-h-[24rem]' : 'max-h-0 opacity-0',
+          isBottomPanelOpen ? 'max-h-[58vh] opacity-100 md:max-h-[36rem]' : 'max-h-0 opacity-0',
         ]"
       >
-        <div class="max-h-[58vh] overflow-y-auto px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2 md:max-h-[24rem] md:overflow-y-auto md:pb-3">
+        <div class="max-h-[58vh] overflow-y-auto px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2 md:max-h-[36rem] md:overflow-y-auto md:pb-3">
           <div>
             <div
               class="grid min-h-0 gap-0"
@@ -798,6 +790,13 @@ function startSync() {
               </div>
             </div>
           </div>
+          <StorageUsage
+            v-if="visualizationChat"
+            :key="String(visualizationChat.id)"
+            :chat-id="String(visualizationChat.id)"
+            :chat-name="visualizationChat.name"
+            class="mt-2 mb-1"
+          />
         </div>
       </div>
 
