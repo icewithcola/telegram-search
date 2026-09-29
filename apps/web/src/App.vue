@@ -56,7 +56,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-background text-foreground transition-all duration-300 ease-in-out">
+  <div class="h-screen overflow-hidden bg-background text-foreground transition-all duration-300 ease-in-out">
     <Toaster position="top-right" :expand="true" :rich-colors="true" />
 
     <RouterView v-slot="{ Component }">
