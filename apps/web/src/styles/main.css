@@ -73,6 +73,21 @@
 
 * {
   border-color: hsl(var(--border));
+  touch-action: pan-y pinch-zoom;
+}
+
+/* Allow horizontal pan on elements that need it (e.g. horizontal scroll containers) */
+[data-touch-action="pan-x"] {
+  touch-action: pan-x pinch-zoom;
+}
+
+/* Interactive controls that should not trigger panning */
+button,
+[role="button"],
+select,
+input[type="range"],
+input[type="checkbox"],
+input[type="radio"] {
   touch-action: manipulation;
 }
 
@@ -89,6 +104,17 @@ body,
   color: hsl(var(--foreground));
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Prevent the page body from scrolling on iOS/iPadOS */
+  overflow: hidden;
+}
+
+/* Enable momentum (inertial) scrolling on iOS/iPadOS for all scrollable containers */
+[class*="overflow-y-auto"],
+[class*="overflow-auto"],
+[class*="overflow-y-scroll"],
+[class*="overflow-scroll"] {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 
 html {
