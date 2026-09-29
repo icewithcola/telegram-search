@@ -45,3 +45,9 @@ export interface MediaBinaryProvider {
    */
   load: (location: MediaBinaryLocation) => Promise<Uint8Array | null>
 }
+
+export interface StorageUsage {
+  totalBytes: number
+  messageBytes?: number
+  photoBytes?: number
+}

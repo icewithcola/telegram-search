@@ -5,6 +5,7 @@ import type { Models } from '../models'
 import type { DBRetrievalMessages } from '../models/utils/message'
 import type { CoreDialog, DialogType } from '../types/dialog'
 
+import { fetchChatStorageUsage, fetchStorageUsage } from '../models/storage'
 import { convertToCoreRetrievalMessages } from '../models/utils/message'
 import { CoreEventType } from '../types/events'
 import { embedContents } from '../utils/embed'
@@ -12,6 +13,19 @@ import { isChatWhitelisted, withSyncWhitelistLock } from '../utils/sync-whitelis
 
 export function registerStorageEventHandlers(ctx: CoreContext, logger: Logger, dbModels: Models) {
   logger = logger.withContext('core:storage:event')
+
+  ctx.emitter.on(CoreEventType.StorageFetchUsage, async ({ requestId, chatId }) => {
+    try {
+      const usage = chatId !== undefined
+        ? await fetchChatStorageUsage(ctx.getDB(), ctx.getCurrentAccountId(), chatId)
+        : await fetchStorageUsage(ctx.getDB())
+      ctx.emitter.emit(CoreEventType.StorageUsage, { requestId, usage })
+    }
+    catch (error) {
+      logger.withError(error).warn('Failed to inspect storage usage')
+      ctx.emitter.emit(CoreEventType.StorageUsage, { requestId, error: 'Failed to inspect storage usage' })
+    }
+  })
 
   ctx.emitter.on(CoreEventType.StorageFetchMessageEditMarks, async ({ chatId, messageIds, requestId }) => {
     logger.withFields({ chatId, count: messageIds.length }).verbose('Fetching message edit marks')

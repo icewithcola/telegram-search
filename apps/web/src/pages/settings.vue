@@ -6,6 +6,8 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 
+import StorageUsage from '../components/StorageUsage.vue'
+
 import { Button } from '../components/ui/Button'
 import { Switch } from '../components/ui/Switch'
 import {
@@ -291,6 +293,8 @@ async function updateConfig() {
       </div>
 
       <div v-else class="mx-auto max-w-4xl p-4 space-y-8 md:p-6">
+        <StorageUsage />
+
         <section v-if="accountSettings?.syncWhitelist" class="border rounded-xl bg-card p-6 space-y-4">
           <div class="flex items-center justify-between gap-4">
             <div>

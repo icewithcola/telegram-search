@@ -367,5 +367,17 @@
   },
   "virtualMessageList": {
     "scrolling": "加载中"
+  },
+  "storage": {
+    "title": "数据库存储",
+    "chatTitle": "存储 · {name}",
+    "description": "所有账户共用的应用数据表和索引大小。不含单独存储的媒体文件和浏览器缓存。",
+    "chatDescription": "此聊天的消息行（含向量）和照片行的估算大小。不含共享索引、空闲空间和单独存储的媒体。共享聊天会计入每个账户；估算值之和不等于数据库总大小。",
+    "total": "总计",
+    "messages": "消息和向量",
+    "photos": "照片记录",
+    "refresh": "刷新",
+    "loading": "加载中…",
+    "failed": "无法加载存储用量，请尝试刷新。"
   }
 }
