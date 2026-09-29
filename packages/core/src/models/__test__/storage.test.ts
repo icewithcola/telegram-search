@@ -18,13 +18,13 @@ beforeAll(async () => {
       id text PRIMARY KEY, platform text, in_chat_id text,
       owner_account_id text, content text
     );
-    CREATE TABLE photos (id text PRIMARY KEY, message_id text, caption text);
+    CREATE TABLE photos (id text PRIMARY KEY, message_id text, caption text, image_bytes bytea, image_thumbnail_bytes bytea);
     INSERT INTO joined_chats VALUES ('joined', 'chat', 'telegram');
     INSERT INTO account_joined_chats VALUES ('alice', 'joined'), ('bob', 'joined');
     INSERT INTO chat_messages VALUES
       ('alice-message', 'telegram', 'chat', 'alice', 'private'),
       ('shared-message', 'telegram', 'chat', NULL, 'shared');
-    INSERT INTO photos VALUES ('photo', 'alice-message', 'private photo');
+    INSERT INTO photos VALUES ('photo', 'alice-message', 'private photo', '\x010203'::bytea, '\x0405'::bytea);
   `)
 })
 

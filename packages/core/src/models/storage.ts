@@ -13,7 +13,7 @@ export async function fetchStorageUsage(db: CoreDB): Promise<StorageUsage> {
   return { totalBytes: Number(result.rows[0].total_bytes) }
 }
 
-/** Row-size estimates exclude shared indexes, free space and external media. */
+/** Row-size estimates exclude shared indexes and free space. */
 export async function fetchChatStorageUsage(db: CoreDB, accountId: string, chatId: string): Promise<StorageUsage> {
   const result = await db.execute<{ message_bytes: string, photo_bytes: string }>(sql`
     WITH visible_messages AS MATERIALIZED (
@@ -30,7 +30,11 @@ export async function fetchChatStorageUsage(db: CoreDB, accountId: string, chatI
     )
     SELECT
       (SELECT COALESCE(SUM(bytes), 0)::text FROM visible_messages) AS message_bytes,
-      (SELECT COALESCE(SUM(pg_column_size(p)), 0)::text FROM photos p
+      (SELECT COALESCE(SUM(
+         pg_column_size(p)
+         + COALESCE(octet_length(p.image_bytes), 0)
+         + COALESCE(octet_length(p.image_thumbnail_bytes), 0)
+       ), 0)::text FROM photos p
        WHERE p.message_id IN (SELECT id FROM visible_messages)) AS photo_bytes
   `)
   const messageBytes = Number(result.rows[0].message_bytes)
