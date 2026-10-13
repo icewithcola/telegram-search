@@ -46,12 +46,14 @@ describe('eventa application adapters', () => {
 
     expect(socket.onmessage).toBe(originalOnMessage)
     expect(socket.send).toHaveBeenCalledOnce()
-    const logError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
     socket.dispatchEvent(new MessageEvent('message', { data: JSON.stringify({ type: 'storage:usage', data: { requestId: 'usage' } }) }))
-    expect(logError).not.toHaveBeenCalled()
-    logError.mockRestore()
+    socket.dispatchEvent(new MessageEvent('message', { data: '{"type":"server:pong"}' }))
+    const errors = consoleError.mock.calls.slice()
+    consoleError.mockRestore()
     await bridge.dispose?.()
     await expect(pending).rejects.toThrow()
+    expect(errors).toEqual([])
   })
 
   it('rebinds the local runtime after an account context reset', async () => {

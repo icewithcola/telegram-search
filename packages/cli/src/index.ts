@@ -4,9 +4,11 @@ import type { OutputMeta } from './output'
 
 import process from 'node:process'
 
+import { realpathSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
 import { createInterface } from 'node:readline/promises'
+import { pathToFileURL } from 'node:url'
 
 import { retryTelegramResult, toAppError } from '@tg-search/core'
 import { normalizeRemoteUrl } from '@tg-search/protocol'
@@ -313,6 +315,7 @@ const messagesCommand = defineCommand({
         from: { type: 'string' },
         to: { type: 'string' },
         sender: { type: 'string' },
+        query: { type: 'string', description: 'Search message text on Telegram' },
         ...profileArg,
       },
       async run(context) {
@@ -322,6 +325,7 @@ const messagesCommand = defineCommand({
             chatId: stringArg(context.args.chat),
             limit: Number(context.args.limit),
             cursor: stringArg(context.args.cursor) || undefined,
+            query: stringArg(context.args.query) || undefined,
             fromUserId: stringArg(context.args.sender) || undefined,
             from: parseTimestamp(stringArg(context.args.from)),
             to: parseTimestamp(stringArg(context.args.to)),
@@ -608,7 +612,7 @@ export async function runCli(args = process.argv.slice(2)): Promise<void> {
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
   runCli().catch((error) => {
     process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`)
     process.exitCode = 1

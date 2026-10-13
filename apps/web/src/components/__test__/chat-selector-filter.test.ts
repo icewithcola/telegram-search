@@ -51,7 +51,7 @@ describe('sync chat selector folders', () => {
       setup: () => () => h(ChatSelector, {
         chats,
         folders,
-        selectedChats: [],
+        'selectedChats': [],
         'onUpdate:visibleChatIds': (ids: number[]) => {
           visibleChatIds.value = ids
         },

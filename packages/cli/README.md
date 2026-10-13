@@ -4,6 +4,37 @@
 
 ## Install and build
 
+Install the released CLI with Homebrew on macOS or Linux:
+
+Homebrew installs Node.js as a runtime dependency. You do not need to install
+Node.js manually or build this repository. This package provides the local CLI
+and daemon; see the [root README](../../README.md) for web application deployment.
+
+```bash
+brew tap groupultra/telegram-search https://github.com/groupultra/telegram-search
+brew install groupultra/telegram-search/tg-search
+tg-search profile configure --apiId YOUR_API_ID --apiHash YOUR_API_HASH
+tg-search auth login
+brew services start groupultra/telegram-search/tg-search
+tg-search daemon status
+```
+
+`brew services` manages the `default` profile as your user and starts it again
+at login. Its data stays in the normal CLI data directory, including across
+Homebrew upgrades. Logs are `daemon.stdout.log` and `daemon.stderr.log` beside
+the default profile's data, with the daemon's existing rotation and retention.
+Configure credentials in the profile; a login service does not inherit your
+terminal's Telegram environment variables. Run the commands without `sudo`.
+
+```bash
+brew services stop groupultra/telegram-search/tg-search
+brew upgrade groupultra/telegram-search/tg-search
+brew services restart groupultra/telegram-search/tg-search
+```
+
+For other profiles, use `tg-search --profile NAME daemon run` with your own
+supervisor configuration.
+
 From this monorepo:
 
 ```bash
@@ -14,6 +45,22 @@ pnpm cli --help
 ```
 
 The package exposes the `tg-search` executable when installed from a registry.
+
+### Release packaging
+
+After building packages, run
+`node packages/cli/scripts/package-release.mjs out/homebrew` to produce a
+standalone npm tarball. Bundled workspace code and exact runtime dependency
+versions replace workspace/catalog protocols; `npm-shrinkwrap.json` pins the
+dependency tree, including optional native binaries for the installation host.
+No workspace packages need to be published to npm.
+
+The Release CLI workflow builds the tagged source, verifies installation and a
+local database query, and attaches the tarball and updated Formula to the GitHub
+Release. Copy the released `tg-search.rb` into `Formula/tg-search.rb` in a PR and
+merge it to make the new version available through the tap. Release uploads
+intentionally reject existing assets instead of replacing a checksummed
+installation source.
 
 ## Profiles and login
 
@@ -33,7 +80,7 @@ Supported commands: `chats list`, `messages list`, `messages query`, `search`, `
 
 `sync` and `export` are not exposed remotely in this version; run them on the host owning the data. `auth` and `daemon` are local management commands and reject remote profiles. Use a separate local profile for local operation. There is no automatic fallback when the server is unreachable.
 
-See [server setup](../../../apps/server/README.md) for access-token and account configuration. Saved-index queries work without an active Telegram connection; live chat/message reads require the account to be signed in on the server.
+See [server setup](../../apps/server/README.md) for access-token and account configuration. Saved-index queries work without an active Telegram connection; live chat/message reads require the account to be signed in on the server.
 
 Profiles isolate Telegram credentials, the StringSession, PGlite data, and exports under the operating system's application data directory. Config and session files use mode `0600`, and `TG_SEARCH_HOME` can override the data root.
 
@@ -79,6 +126,9 @@ tg-search --profile work chats list --limit 200 --json
 # Read one chat remotely. No messages are persisted.
 tg-search --profile work messages list --chat 123456 --from 2026-01-01 --to 2026-12-31 --json
 
+# Search one chat on Telegram, without syncing it first.
+tg-search --profile work messages list --chat 123456 --query "项目进展" --from 2026-01-01 --json
+
 # After the user explicitly approves Telegram Takeout, persist selected chats.
 # At least --chat or --all is required. Never add --takeout without that approval.
 tg-search --profile work sync --takeout --chat 123456,789012 --from 2026-01-01 --to 2026-12-31
@@ -93,6 +143,8 @@ tg-search --profile work stats --group-by month --timezone Asia/Singapore --from
 If Telegram returns `TAKEOUT_INIT_DELAY_*`, the CLI emits `TAKEOUT_AUTHORIZATION_REQUIRED` with `details.action: "authorize_takeout_in_telegram"`. An Agent must stop, ask the user to review and authorize the pending data export request on one of their Telegram devices, and rerun `sync --takeout` only after the user confirms and Telegram allows it. This is distinct from the user's initial approval for the CLI to add `--takeout`; it is a Telegram-side security confirmation and is never retried automatically.
 
 The current CLI `search` command uses local jieba text retrieval. It does not generate query embeddings, so vector retrieval is not enabled by this command.
+
+`messages list` reads newest first. Its `next_cursor` is the ID of the last message scanned, so paging stays correct while the chat receives new messages; pass it back as `--cursor`, or pass any known message ID to read strictly older messages. A page may contain fewer than `--limit` items, even none, because service messages are skipped and one call scans a bounded amount of history. Only `next_cursor: null` means the requested range has been read completely.
 
 Remote pages may include Telegram's raw `total`, but Telegram does not guarantee that it reflects the CLI's sender and date filters. Treat it as informational rather than as an exact filtered count. Use Takeout plus local queries when exact filtered counts are required.
 
@@ -120,7 +172,7 @@ The CLI performs no AI analysis. An Agent can read the JSONL files and produce a
 ## Privacy boundary
 
 - Remote `chats list` and `messages list` read Telegram without persisting message domain data.
-- Only `sync --takeout` persists messages, and the Agent may add `--takeout` only after explicit user approval.
+- Bulk history is persisted through `sync --takeout`, and the Agent may add `--takeout` only after explicit user approval. A running, authenticated daemon also persists new messages, edits, and deletions in realtime.
 - Declined consent or Takeout initialization failure stops the sync; it never falls back to ordinary `GetHistory` bulk reads.
 - Takeout requests only the selected chat category and does not request contacts or files for text sync.
 - Local query, search, context, stats, and export do not create a Telegram connection.

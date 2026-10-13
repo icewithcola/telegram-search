@@ -1,6 +1,7 @@
 import { CoreEventType } from '@tg-search/core'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { ref } from 'vue'
 
 import { useChatStore } from '../useChat'
 
@@ -21,24 +22,16 @@ vi.mock('../useSession', () => ({
 }))
 
 // Mock localStorage
-const localStorageMock = new Map<string, any>()
+const localStorageMock = new Map<string, unknown>()
 vi.mock('@vueuse/core', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@vueuse/core')>()
   return {
     ...actual,
-    useLocalStorage: (key: string, initialValue: any) => {
-      // Simple mock for useLocalStorage using a ref-like object
-      let val = localStorageMock.get(key) ?? initialValue
-      return {
-        // Setter to update mock map
-        set value(v: any) {
-          localStorageMock.set(key, v)
-          val = v
-        },
-        get value() {
-          return val
-        },
-      }
+    useLocalStorage: (key: string, initialValue: unknown) => {
+      // Computed chat lists stayed cached when the storage mock did not trigger reactive updates.
+      const value = ref(localStorageMock.get(key) ?? initialValue)
+      localStorageMock.set(key, value)
+      return value
     },
   }
 })
