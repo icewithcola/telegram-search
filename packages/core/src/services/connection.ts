@@ -14,6 +14,7 @@ import { StringSession } from 'telegram/sessions'
 
 import { CoreEventType } from '../types/events'
 import { waitForEvent } from '../utils/promise'
+import { createTelegramSocket } from '../utils/telegram-socket'
 
 export type ConnectionService = ReturnType<typeof createConnectionService>
 
@@ -104,6 +105,7 @@ export function createConnectionService(ctx: CoreContext, logger: Logger, option
         useWSS,
         proxy: isBrowser() ? undefined : proxy,
         connection: ConnectionTCPObfuscated,
+        networkSocket: isBrowser() ? undefined : createTelegramSocket(logger),
       },
     )
 

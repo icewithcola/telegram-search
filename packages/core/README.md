@@ -72,3 +72,9 @@ login instead of sharing a session string.
 Phone-login retries reuse the pending attempt and replay its current code/password
 prompt. Input listeners are registered before prompting so synchronous local
 bridges cannot lose a response. Authentication-stage logs contain no input values.
+
+Node TCP reads close their transport after 30 seconds without data, allowing
+GramJS to retry a stalled encryption-key handshake during initial connection or
+data-center migration. The original read settles before that retry; no parallel
+login client is created. Normal Telegram heartbeat replies keep idle authorized
+connections alive while the user enters a code or two-factor password.
