@@ -75,6 +75,7 @@ describe('storage usage', () => {
     const provider: MediaBinaryProvider = {
       save: vi.fn(async () => { throw new Error('not used') }),
       load: vi.fn(async () => { throw new Error('media contents must not be loaded') }),
+      loadRange: vi.fn(async () => { throw new Error('media contents must not be loaded') }),
       size,
     }
     const ctx = createCoreContext(() => db, {} as Models, useLogger())
@@ -94,6 +95,7 @@ describe('storage usage', () => {
     )
     expect(size).toHaveBeenCalledTimes(2)
     expect(provider.load).not.toHaveBeenCalled()
+    expect(provider.loadRange).not.toHaveBeenCalled()
     ctx.cleanup()
   })
 

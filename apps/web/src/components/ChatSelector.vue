@@ -5,10 +5,9 @@ import { VList } from 'virtua/vue'
 import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-import { matchesFolder } from '../utils/chat-list'
-
 import EntityAvatar from './avatar/EntityAvatar.vue'
 
+import { matchesFolder } from '../utils/chat-list'
 import { Input } from './ui/Input'
 
 const props = defineProps<{

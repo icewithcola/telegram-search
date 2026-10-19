@@ -795,7 +795,7 @@ function startSync() {
             :key="String(visualizationChat.id)"
             :chat-id="String(visualizationChat.id)"
             :chat-name="visualizationChat.name"
-            class="mt-2 mb-1"
+            class="mb-1 mt-2"
           />
         </div>
       </div>
