@@ -56,3 +56,15 @@ loading the files. Completed chat results are cached per browser session and cha
 Refresh recalculates them. Missing media is reported. Chat estimates exclude
 shared indexes and free space and need not add up to the database total. This
 read-only inspection requires no schema migration.
+
+## Telegram session lifecycle
+
+A connection service retains one authorized Telegram client across repeated login
+requests, including requests received before account bootstrap finishes. Failed
+candidates are destroyed before retry notifications; logout destroys the client
+before another login can create a replacement.
+
+Telegram's `AUTH_KEY_DUPLICATED` (406) means the authorization key has already been
+invalidated. The core clears the saved session and signals disconnection; sign in
+again to create a fresh key. Give each independent app instance its own Telegram
+login instead of sharing a session string.

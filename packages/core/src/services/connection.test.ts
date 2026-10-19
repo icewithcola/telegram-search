@@ -20,7 +20,7 @@ const telegramMock = vi.hoisted(() => {
     invoke: ReturnType<typeof vi.fn>
     signInUser: ReturnType<typeof vi.fn>
     destroy: ReturnType<typeof vi.fn>
-    session: { save: ReturnType<typeof vi.fn> }
+    session: { save: ReturnType<typeof vi.fn>, delete: ReturnType<typeof vi.fn> }
 
     constructor() {
       this.connect = vi.fn(nextConnect.shift() ?? (async () => true))
@@ -32,7 +32,7 @@ const telegramMock = vi.hoisted(() => {
       })
       this.signInUser = vi.fn()
       this.destroy = vi.fn(nextDestroy.shift() ?? (async () => undefined))
-      this.session = { save: vi.fn(async () => 'saved-session') }
+      this.session = { save: vi.fn(async () => 'saved-session'), delete: vi.fn() }
       clients.push(this)
     }
   }
@@ -91,6 +91,84 @@ afterEach(() => {
 })
 
 describe('connection service login lifecycle', () => {
+  it('reuses the authorized client when login is replayed before account readiness', async () => {
+    const { ctx, service } = createService()
+    const connected = vi.fn()
+    ctx.emitter.on(CoreEventType.AuthConnected, connected)
+    // Login can be replayed after authorization while AccountReady bootstrap is still running.
+    const first = await service.loginWithSession('session')
+    const replay = await service.loginWithSession('session')
+
+    expect(replay.orUndefined()).toBe(first.orUndefined())
+    expect(telegramMock.clients).toHaveLength(1)
+    expect(ctx.setClient).toHaveBeenCalledOnce()
+    expect(connected).toHaveBeenCalledOnce()
+  })
+
+  it('reuses a phone-authorized client for session login', async () => {
+    const { service } = createService()
+    const first = await service.loginWithPhone('+15555550123')
+    const replay = await service.loginWithSession('saved-session')
+
+    expect(replay.orUndefined()).toBe(first.orUndefined())
+    expect(telegramMock.clients).toHaveLength(1)
+  })
+
+  it('destroys a logged-out client before allowing a new login', async () => {
+    const { service } = createService()
+    await service.loginWithSession('session')
+    const client = telegramMock.clients[0]!
+    await service.logout(client as never)
+    await service.loginWithPhone('+15555550123')
+
+    expect(client.destroy).toHaveBeenCalledOnce()
+    expect(client.session.delete).toHaveBeenCalledOnce()
+    expect(telegramMock.clients).toHaveLength(2)
+  })
+
+  it('destroys the client even when the Telegram logout request fails', async () => {
+    const { service, ctx } = createService()
+    const disconnected = vi.fn()
+    ctx.emitter.on(CoreEventType.AuthDisconnected, disconnected)
+    await service.loginWithSession('session')
+    const client = telegramMock.clients[0]!
+    client.connected = true
+    telegramMock.nextStateErrors.push(new Error('network failed'))
+
+    await expect(service.logout(client as never)).rejects.toThrow('network failed')
+
+    expect(client.destroy).toHaveBeenCalledOnce()
+    expect(client.session.delete).toHaveBeenCalledOnce()
+    expect(disconnected).toHaveBeenCalledOnce()
+    await service.loginWithPhone('+15555550123')
+    expect(telegramMock.clients).toHaveLength(2)
+  })
+
+  it.each(['connect', 'invoke'] as const)('invalidates a duplicated auth key reported by %s', async (stage) => {
+    const { ctx, service } = createService()
+    const disconnected = vi.fn()
+    const updateSession = vi.fn()
+    ctx.emitter.on(CoreEventType.AuthDisconnected, disconnected)
+    ctx.emitter.on(CoreEventType.SessionUpdate, updateSession)
+    const error = new RPCError('AUTH_KEY_DUPLICATED', new Api.updates.GetState(), 406)
+    if (stage === 'connect') {
+      telegramMock.nextConnect.push(async () => {
+        throw error
+      })
+    }
+    else {
+      telegramMock.nextStateErrors.push(error)
+    }
+
+    const result = await service.loginWithSession('session')
+
+    expect(result.orUndefined()).toBeUndefined()
+    expect(telegramMock.clients[0]!.destroy).toHaveBeenCalledOnce()
+    expect(disconnected).toHaveBeenCalledOnce()
+    expect(updateSession).toHaveBeenCalledWith({ session: '' })
+    expect(ctx.withError).toHaveBeenCalledWith(error, expect.stringContaining('Sign in again'))
+  })
+
   it('notifies recovery only after slow failed-login cleanup has finished', async () => {
     vi.useFakeTimers()
     const { ctx, service } = createService()

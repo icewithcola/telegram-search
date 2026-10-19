@@ -135,6 +135,31 @@ describe('webSocket session recovery', () => {
     expect(socket.logins()).toHaveLength(3)
   })
 
+  it('clears revoked credentials so reconnects and reloads cannot reuse the invalid key', async () => {
+    const socket = await connect()
+    const sessionId = useSessionStore().activeSessionId!
+    useSessionStore().updateSession(sessionId, { me: { id: 'account', name: 'Test user', type: 'user', username: 'test' } })
+    // Stopping a retry timer alone left the revoked key in persistent local storage.
+    await socket.receive(CoreEventType.AuthError)
+    await socket.receive(CoreEventType.AuthDisconnected)
+    expect(useSessionStore().activeSession?.session).toBeUndefined()
+    expect(useSessionStore().activeSession?.me).toBeUndefined()
+    expect(useSessionStore().activeSessionId).toBe(sessionId)
+
+    socket.close()
+    await vi.advanceTimersByTimeAsync(2000)
+    const recovered = await connect()
+    expect(recovered.logins()).toHaveLength(0)
+
+    disposePinia(pinia)
+    pinia = createPinia()
+    setActivePinia(pinia)
+    const sessions = useSessionStore()
+    sessions.init()
+    expect(sessions.activeSessionId).toBe(sessionId)
+    expect(sessions.activeSession?.session).toBeUndefined()
+  })
+
   it('does not retry a removed account or keep retry timers after disposal', async () => {
     const socket = await connect()
     await socket.receive(CoreEventType.AuthError)

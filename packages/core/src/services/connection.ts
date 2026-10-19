@@ -122,6 +122,7 @@ export function createConnectionService(ctx: CoreContext, logger: Logger, option
   }
 
   let loginInFlight: Promise<Result<TelegramClient>> | undefined
+  let authorizedClient: TelegramClient | undefined
 
   async function destroyCandidate(client: TelegramClient | undefined) {
     if (!client) {
@@ -137,6 +138,13 @@ export function createConnectionService(ctx: CoreContext, logger: Logger, option
   }
 
   function runLogin(login: () => Promise<Result<TelegramClient>>): Promise<Result<TelegramClient>> {
+    if (authorizedClient) {
+      // AccountReady bootstrap can outlive login. Replaying login must not open
+      // another main connection with the same key and trigger AUTH_KEY_DUPLICATED.
+      logger.verbose('Reusing authorized Telegram client')
+      return Promise.resolve(Ok(authorizedClient))
+    }
+
     if (loginInFlight) {
       logger.verbose('Reusing in-flight Telegram login')
       return loginInFlight
@@ -168,6 +176,7 @@ export function createConnectionService(ctx: CoreContext, logger: Logger, option
 
         // 2) Attach client to context for subsequent services.
         ctx.setClient(client)
+        authorizedClient = client
         retained = true
 
         // 3) Finally signal that auth is connected; this will trigger
@@ -183,10 +192,14 @@ export function createConnectionService(ctx: CoreContext, logger: Logger, option
         if (!retained)
           await destroyCandidate(client)
         ctx.emitter.emit(CoreEventType.AuthError)
-        if (error instanceof RPCError && (error.code === 401 || error.errorMessage === 'AUTH_KEY_DUPLICATED')) {
+        const duplicatedKey = error instanceof RPCError && error.errorMessage === 'AUTH_KEY_DUPLICATED'
+        if (error instanceof RPCError && (error.code === 401 || duplicatedKey)) {
+          ctx.emitter.emit(CoreEventType.SessionUpdate, { session: '' })
           ctx.emitter.emit(CoreEventType.AuthDisconnected)
         }
-        return Err(ctx.withError(error, 'Failed to login with session'))
+        return Err(ctx.withError(error, duplicatedKey
+          ? 'Telegram invalidated this session because it was used by multiple connections. Sign in again and use a separate session for each client.'
+          : 'Failed to login with session'))
       }
     })
   }
@@ -214,6 +227,7 @@ export function createConnectionService(ctx: CoreContext, logger: Logger, option
 
         // 2) Attach client
         ctx.setClient(client)
+        authorizedClient = client
         retained = true
 
         // 3) Notify connected; afterConnectedEventHandler will establish
@@ -265,13 +279,18 @@ export function createConnectionService(ctx: CoreContext, logger: Logger, option
   }
 
   async function logout(client: TelegramClient) {
-    if (client.connected) {
-      await client.invoke(new Api.auth.LogOut())
-      await client.disconnect()
+    try {
+      if (client.connected) {
+        await client.invoke(new Api.auth.LogOut())
+      }
+    }
+    finally {
+      await client.destroy()
+      authorizedClient = undefined
+      client.session.delete()
       ctx.emitter.emit(CoreEventType.AuthDisconnected)
     }
 
-    client.session.delete()
     logger.verbose('Logged out from Telegram')
     return Ok(null)
   }

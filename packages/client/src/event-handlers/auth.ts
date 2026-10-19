@@ -28,6 +28,10 @@ export function registerBasicEventHandlers(
   registerEventHandler(CoreEventType.AuthDisconnected, () => {
     logger.log('Auth disconnected, cleaning up session metadata')
     useAccountStore().stopRecovery()
+    const sessions = useSessionStore()
+    if (sessions.activeSessionId) {
+      sessions.updateSession(sessions.activeSessionId, { session: undefined, me: undefined })
+    }
   })
 
   // Core forwards updated StringSession to the client; let bridge store decide

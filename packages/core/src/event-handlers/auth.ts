@@ -3,8 +3,6 @@ import type { Logger } from '@guiiai/logg'
 import type { CoreContext } from '../context'
 import type { ConnectionService } from '../services'
 
-import { StringSession } from 'telegram/sessions'
-
 import { CoreEventType } from '../types/events'
 
 export function registerAuthEventHandlers(ctx: CoreContext, logger: Logger) {
@@ -20,7 +18,7 @@ export function registerAuthEventHandlers(ctx: CoreContext, logger: Logger) {
 
       if (session) {
         logger.verbose('Using client-provided session')
-        return configuredConnectionService.loginWithSession(new StringSession(session))
+        return configuredConnectionService.loginWithSession(session)
       }
     })
 
