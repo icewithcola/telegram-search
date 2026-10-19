@@ -12,11 +12,13 @@ export function registerBasicEventHandlers(
   const logger = useLogger('Auth')
 
   registerEventHandler(CoreEventType.AuthCodeNeeded, () => {
+    useAccountStore().auth.needPassword = false
     useAccountStore().auth.needCode = true
     useAccountStore().auth.isLoading = false
   })
 
   registerEventHandler(CoreEventType.AuthPasswordNeeded, () => {
+    useAccountStore().auth.needCode = false
     useAccountStore().auth.needPassword = true
     useAccountStore().auth.isLoading = false
   })

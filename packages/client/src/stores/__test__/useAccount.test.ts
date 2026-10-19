@@ -105,6 +105,24 @@ describe('useAccountStore', () => {
     expect(sessionActions.removeCurrentAccount).toHaveBeenCalled()
   })
 
+  it('clears old auth prompts before an explicit phone login can replay them', () => {
+    const store = useAccountStore()
+    store.auth.needCode = true
+    store.auth.needPassword = true
+    store.handleAuth().login('+15555550123')
+    expect(store.auth.needCode).toBe(false)
+    expect(store.auth.needPassword).toBe(false)
+  })
+
+  it('clears stale input prompts when authorization is stopped', () => {
+    const store = useAccountStore()
+    store.auth.needCode = true
+    store.auth.needPassword = true
+    store.stopRecovery()
+    expect(store.auth.needCode).toBe(false)
+    expect(store.auth.needPassword).toBe(false)
+  })
+
   it('marks ready correctly', async () => {
     const store = useAccountStore()
     store.markReady()

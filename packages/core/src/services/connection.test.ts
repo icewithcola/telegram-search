@@ -12,6 +12,10 @@ const telegramMock = vi.hoisted(() => {
   const nextAuthorization: boolean[] = []
   const nextStateErrors: Error[] = []
   const nextDestroy: Array<() => Promise<void>> = []
+  const nextSignIn: Array<(credentials: unknown, callbacks: {
+    phoneCode: () => Promise<string>
+    password: () => Promise<string>
+  }) => Promise<unknown>> = []
 
   class TelegramClient {
     connected = false
@@ -30,14 +34,14 @@ const telegramMock = vi.hoisted(() => {
         if (error)
           throw error
       })
-      this.signInUser = vi.fn()
+      this.signInUser = vi.fn(nextSignIn.shift())
       this.destroy = vi.fn(nextDestroy.shift() ?? (async () => undefined))
       this.session = { save: vi.fn(async () => 'saved-session'), delete: vi.fn() }
       clients.push(this)
     }
   }
 
-  return { clients, nextAuthorization, nextConnect, nextStateErrors, nextDestroy, TelegramClient }
+  return { clients, nextAuthorization, nextConnect, nextStateErrors, nextDestroy, nextSignIn, TelegramClient }
 })
 
 vi.mock('telegram', () => ({
@@ -86,11 +90,49 @@ afterEach(() => {
   telegramMock.nextConnect.length = 0
   telegramMock.nextStateErrors.length = 0
   telegramMock.nextDestroy.length = 0
+  telegramMock.nextSignIn.length = 0
   vi.useRealTimers()
   vi.clearAllMocks()
 })
 
 describe('connection service login lifecycle', () => {
+  it.each([
+    { prompt: CoreEventType.AuthCodeNeeded, input: CoreEventType.AuthCode, field: 'code', callback: 'phoneCode' },
+    { prompt: CoreEventType.AuthPasswordNeeded, input: CoreEventType.AuthPassword, field: 'password', callback: 'password' },
+  ] as const)('replays a pending $field prompt when phone login is requested again', async ({ prompt, input, field, callback }) => {
+    const { ctx, service } = createService()
+    const needed = vi.fn()
+    ctx.emitter.on(prompt, needed)
+    const waiting = new Promise<void>(resolve => ctx.emitter.once(prompt, resolve))
+    telegramMock.nextAuthorization.push(false)
+    telegramMock.nextSignIn.push(async (_credentials, callbacks) => {
+      await callbacks[callback]()
+      return {}
+    })
+    const first = service.loginWithPhone('+15555550123')
+    await waiting
+    // A reconnect/retry used to share the waiting promise without resending the lost prompt.
+    const replay = service.loginWithPhone('+15555550123')
+    expect(needed).toHaveBeenCalledTimes(2)
+    expect(telegramMock.clients).toHaveLength(1)
+    ctx.emitter.emit(input, { [field]: 'test-input' })
+    await Promise.all([first, replay])
+    expect(ctx.setClient).toHaveBeenCalledOnce()
+    expect(ctx.emitter.listenerCount(input)).toBe(0)
+  })
+
+  it('registers the code listener before notifying the client', async () => {
+    const { ctx, service } = createService()
+    telegramMock.nextAuthorization.push(false)
+    telegramMock.nextSignIn.push(async (_credentials, callbacks) => {
+      expect(await callbacks.phoneCode()).toBe('12345')
+      return {}
+    })
+    // Browser-local bridges can answer synchronously, before emit returns.
+    ctx.emitter.on(CoreEventType.AuthCodeNeeded, () => ctx.emitter.emit(CoreEventType.AuthCode, { code: '12345' }))
+    expect((await service.loginWithPhone('+15555550123')).orUndefined()).toBe(telegramMock.clients[0])
+  })
+
   it('reuses the authorized client when login is replayed before account readiness', async () => {
     const { ctx, service } = createService()
     const connected = vi.fn()

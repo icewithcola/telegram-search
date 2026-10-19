@@ -13,3 +13,7 @@ Each connection registers its listeners before processing the server's account r
 Failed saved-session logins retry with delays of 2, 4, 8, 16, then 30 seconds until recovery. Explicit authorization failure, logout, account changes and store disposal cancel recovery. Authorization failure also removes the revoked session and user metadata from the account slot, so reconnects and page reloads cannot retry an invalid key. `AUTH_KEY_DUPLICATED` requires a fresh phone login; the account slot and indexed data remain available. A failed Telegram authorization probe preserves the original error: network failures do not mean the session was revoked. Server restarts still require a browser with a valid saved session; this change does not persist server-side authorization or replace GramJS's established-connection retry policy.
 
 The approach follows [Telegram Web A's transport implementation](https://github.com/Ajaxy/telegram-tt/blob/ea0d226147a80f05253bf1a6ffef08d694b8e6e4/src/lib/gramjs/network/MTProtoSender.ts): retain authorization across transport failures, retry while connected by user intent, and distinguish broken authorization from temporary disconnection. TGS uses its existing VueUse WebSocket adapter rather than copying the MTProto transport or replaying application mutations.
+
+Phone login preserves the pending code/password step when a lazy login form mounts.
+Re-entering phone login resets old prompt flags so a replay can advance the form,
+and a failed send clears its spinner. Code and password prompts are exclusive.

@@ -75,7 +75,7 @@ export function respondToReadyLogin(peer: Peer, account: AccountState): boolean 
   return true
 }
 
-export function registerCoreEventListeners(logger: Logger, account: AccountState, accountId: string, eventName: keyof FromCoreEvent) {
+export function registerCoreEventListeners(logger: Logger, account: AccountState, accountId: string, eventName: keyof FromCoreEvent, peer: Peer) {
   if (eventName.startsWith('server:')) {
     return
   }
@@ -95,6 +95,10 @@ export function registerCoreEventListeners(logger: Logger, account: AccountState
     account.coreEventListeners.set(eventName, listener)
 
     logger.withFields({ eventName, accountId }).debug('Registered shared core event listener')
+  }
+
+  if (account.pendingAuthPrompt && account.pendingAuthPrompt === eventName) {
+    sendWsEvent(peer, account.pendingAuthPrompt, undefined)
   }
 }
 
@@ -179,7 +183,7 @@ export function setupWsRoutes(app: H3, config: Config) {
         }
 
         if (event.type === 'server:event:register') {
-          registerCoreEventListeners(logger, account, accountId, event.data.event as keyof FromCoreEvent)
+          registerCoreEventListeners(logger, account, accountId, event.data.event as keyof FromCoreEvent, peer)
           return
         }
 

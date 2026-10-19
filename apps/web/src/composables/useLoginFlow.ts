@@ -24,29 +24,24 @@ export function useLoginFlow() {
     twoFactorPassword: '',
   })
 
-  accountStore.auth.needCode = false
-  accountStore.auth.needPassword = false
-  accountStore.auth.isLoading = false
-
   const {
     login,
     submitCode,
     submitPassword,
   } = accountStore.handleAuth()
 
-  watch(() => accountStore.auth.needCode, (value) => {
-    if (value) {
+  watch([
+    () => accountStore.auth.needCode,
+    () => accountStore.auth.needPassword,
+  ], ([needCode, needPassword]) => {
+    if (needCode || needPassword) {
       accountStore.auth.isLoading = false
-      state.value.currentStep = 'code'
+      state.value.currentStep = needPassword ? 'password' : 'code'
     }
-  })
-
-  watch(() => accountStore.auth.needPassword, (value) => {
-    if (value) {
-      accountStore.auth.isLoading = false
-      state.value.currentStep = 'password'
+    else if (!isReady.value) {
+      state.value.currentStep = 'phone'
     }
-  })
+  }, { immediate: true, flush: 'sync' })
 
   watch(isReady, (value) => {
     if (value) {
@@ -88,6 +83,7 @@ export function useLoginFlow() {
       }
     }
     catch (error) {
+      accountStore.auth.isLoading = false
       toast.error(error instanceof Error ? error.message : String(error))
     }
   }

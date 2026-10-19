@@ -30,6 +30,8 @@ export interface AccountState {
    */
   accountReady: boolean
 
+  pendingAuthPrompt?: CoreEventType.AuthCodeNeeded | CoreEventType.AuthPasswordNeeded
+
   /**
    * Core event listeners (registered once, shared by all WebSocket connections)
    */
@@ -93,6 +95,18 @@ export function getOrCreateAccount(accountId: string, config: Config): AccountSt
     ctx.emitter.once(CoreEventType.AccountReady, () => {
       account.accountReady = true
     })
+
+    // Keep only the input stage, never codes or passwords, for peers that reconnect.
+    for (const event of [CoreEventType.AuthCodeNeeded, CoreEventType.AuthPasswordNeeded] as const) {
+      ctx.emitter.on(event, () => {
+        account.pendingAuthPrompt = event
+      })
+    }
+    for (const event of [CoreEventType.AuthCode, CoreEventType.AuthPassword, CoreEventType.AuthConnected, CoreEventType.AuthDisconnected, CoreEventType.AuthError] as const) {
+      ctx.emitter.on(event, () => {
+        account.pendingAuthPrompt = undefined
+      })
+    }
 
     // Instrument core message processing for this account
     ctx.emitter.on(CoreEventType.MessageProcess, ({ messages, isTakeout }) => {

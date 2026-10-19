@@ -123,6 +123,7 @@ export function createConnectionService(ctx: CoreContext, logger: Logger, option
 
   let loginInFlight: Promise<Result<TelegramClient>> | undefined
   let authorizedClient: TelegramClient | undefined
+  let pendingAuthPrompt: CoreEventType.AuthCodeNeeded | CoreEventType.AuthPasswordNeeded | undefined
 
   async function destroyCandidate(client: TelegramClient | undefined) {
     if (!client) {
@@ -147,11 +148,14 @@ export function createConnectionService(ctx: CoreContext, logger: Logger, option
 
     if (loginInFlight) {
       logger.verbose('Reusing in-flight Telegram login')
+      if (pendingAuthPrompt)
+        ctx.emitter.emit(pendingAuthPrompt)
       return loginInFlight
     }
 
     loginInFlight = login().finally(() => {
       loginInFlight = undefined
+      pendingAuthPrompt = undefined
     })
     return loginInFlight
   }
@@ -247,6 +251,22 @@ export function createConnectionService(ctx: CoreContext, logger: Logger, option
     })
   }
 
+  async function requestAuthInput<E extends CoreEventType.AuthCode | CoreEventType.AuthPassword>(
+    event: E,
+    prompt: CoreEventType.AuthCodeNeeded | CoreEventType.AuthPasswordNeeded,
+  ) {
+    // Register first: a local bridge can answer synchronously when notified.
+    const input = waitForEvent(ctx.emitter, event)
+    pendingAuthPrompt = prompt
+    ctx.emitter.emit(prompt)
+    try {
+      return await input
+    }
+    finally {
+      pendingAuthPrompt = undefined
+    }
+  }
+
   async function signIn(phoneNumber: string, client: TelegramClient): Promise<Api.TypeUser> {
     logger.withFields({ phoneNumber }).verbose('User is not authorized, signing in')
 
@@ -257,15 +277,13 @@ export function createConnectionService(ctx: CoreContext, logger: Logger, option
       }, {
         phoneNumber,
         phoneCode: async () => {
-          logger.verbose('Waiting for code')
-          ctx.emitter.emit(CoreEventType.AuthCodeNeeded)
-          const { code } = await waitForEvent(ctx.emitter, CoreEventType.AuthCode)
+          logger.log('Waiting for Telegram login code')
+          const { code } = await requestAuthInput(CoreEventType.AuthCode, CoreEventType.AuthCodeNeeded)
           return code
         },
         password: async () => {
-          logger.verbose('Waiting for password')
-          ctx.emitter.emit(CoreEventType.AuthPasswordNeeded)
-          const { password } = await waitForEvent(ctx.emitter, CoreEventType.AuthPassword)
+          logger.log('Waiting for Telegram two-factor password')
+          const { password } = await requestAuthInput(CoreEventType.AuthPassword, CoreEventType.AuthPasswordNeeded)
           return password
         },
         onError: (error) => {

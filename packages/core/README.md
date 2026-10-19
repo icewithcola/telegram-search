@@ -68,3 +68,7 @@ Telegram's `AUTH_KEY_DUPLICATED` (406) means the authorization key has already b
 invalidated. The core clears the saved session and signals disconnection; sign in
 again to create a fresh key. Give each independent app instance its own Telegram
 login instead of sharing a session string.
+
+Phone-login retries reuse the pending attempt and replay its current code/password
+prompt. Input listeners are registered before prompting so synchronous local
+bridges cannot lose a response. Authentication-stage logs contain no input values.

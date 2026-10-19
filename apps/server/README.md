@@ -54,3 +54,11 @@ Every authenticated request writes an append-only row to `remote_audit_events` b
 These checks protect `/v1/remote/*` only. They do not add authorization to the existing `/ws`, `/v1/photos/*`, or `/v1/stickers/*` routes. Publish only the required integration routes on the integration ingress, and keep the existing web/media surface behind its own access control. A configured policy is not a security wrapper around the whole TGS server. The server process and database administrators remain trusted. Do not log request bodies, tokens, or query text in production; set an appropriate production log level.
 
 The `/ws` route creates account-scoped Eventa peer contexts and keeps HTTP for health checks and binary photo/sticker delivery. During the UI migration, true realtime domain notifications continue to share the same WebSocket connection.
+
+## Interactive login recovery
+
+Account state retains the current code/password prompt across WebSocket disconnects.
+When a new peer subscribes to that prompt, it receives the pending stage without
+opening another Telegram connection or sending another verification code. The stage
+is cleared when input arrives, authorization succeeds, or authentication fails.
+Codes, passwords, and session credentials are never stored in this prompt state.

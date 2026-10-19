@@ -81,6 +81,8 @@ export const useAccountStore = defineStore('account', () => {
       cancelRetry()
       recoveryAllowed = true
       restoringSession = false
+      authStatus.value.needCode = false
+      authStatus.value.needPassword = false
       // NOTICE: session cloud be undefined, we determine it login with phone number as new login
       const session = sessionStore.activeSession?.session
       if (IS_CORE_MODE && (!TELEGRAM_APP_ID || !TELEGRAM_APP_HASH)) {
@@ -140,6 +142,8 @@ export const useAccountStore = defineStore('account', () => {
     cancelRetry()
     attemptCounter = 0
     restoringSession = false
+    authStatus.value.needCode = false
+    authStatus.value.needPassword = false
     if (isReady.value)
       return
 
@@ -183,10 +187,14 @@ export const useAccountStore = defineStore('account', () => {
 
   function stopRecovery() {
     recoveryAllowed = false
+    authStatus.value.needCode = false
+    authStatus.value.needPassword = false
     resetReady()
   }
 
   watch(() => sessionStore.activeSessionId, () => {
+    authStatus.value.needCode = false
+    authStatus.value.needPassword = false
     resetReady()
     attemptCounter = 0
     recoveryAllowed = true
