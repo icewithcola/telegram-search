@@ -124,15 +124,6 @@ export async function registerOpfsMediaStorage(): Promise<MediaBinaryProvider> {
       }
     },
 
-    async size(location: MediaBinaryLocation): Promise<number | null> {
-      try {
-        const fileHandle = await getFileHandle(location.path)
-        return (await fileHandle.getFile()).size
-      }
-      catch {
-        return null
-      }
-    },
   }
 
   mediaBinaryProvider = provider

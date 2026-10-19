@@ -44,9 +44,6 @@ export interface MediaBinaryProvider {
    * longer exists instead of throwing where possible.
    */
   load: (location: MediaBinaryLocation) => Promise<Uint8Array | null>
-
-  /** Read the stored object's size without loading its contents. */
-  size: (location: MediaBinaryLocation) => Promise<number | null>
 }
 
 export interface StorageUsage {

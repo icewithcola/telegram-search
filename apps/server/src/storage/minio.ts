@@ -143,15 +143,6 @@ export async function registerMinioMediaStorage(logger: Logger, dsn: string, acc
       }
     },
 
-    async size(location: MediaBinaryLocation): Promise<number | null> {
-      try {
-        return (await client.statObject(bucket, location.path)).size
-      }
-      catch (error) {
-        logger.withError(error).warn('Failed to stat media in MinIO')
-        return null
-      }
-    },
   }
 
   logger.withFields({ bucket }).log('MinIO media storage provider registered')
